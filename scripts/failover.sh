@@ -98,36 +98,19 @@ echo ""
 # Step 0: Disable autoscalers (required before manual resize)
 log_step "Step 0: Disabling autoscalers for manual control..."
 
-# Get autoscaler names
-PRIMARY_AUTOSCALER=$(gcloud compute region-autoscalers list \
-    --filter="target~$PRIMARY_MIG" \
-    --regions="$PRIMARY_REGION" \
+# Stop autoscaling on primary MIG
+log_info "  Stopping autoscaling on primary MIG..."
+gcloud compute instance-groups managed stop-autoscaling "$PRIMARY_MIG" \
+    --region="$PRIMARY_REGION" \
     --project="$PROJECT_ID" \
-    --format="value(name)" 2>/dev/null | head -1)
+    --quiet 2>/dev/null || log_warning "  Primary autoscaler not found or already stopped"
 
-STANDBY_AUTOSCALER=$(gcloud compute region-autoscalers list \
-    --filter="target~$STANDBY_MIG" \
-    --regions="$STANDBY_REGION" \
+# Stop autoscaling on standby MIG
+log_info "  Stopping autoscaling on standby MIG..."
+gcloud compute instance-groups managed stop-autoscaling "$STANDBY_MIG" \
+    --region="$STANDBY_REGION" \
     --project="$PROJECT_ID" \
-    --format="value(name)" 2>/dev/null | head -1)
-
-if [ -n "$PRIMARY_AUTOSCALER" ]; then
-    log_info "  Disabling primary autoscaler: $PRIMARY_AUTOSCALER"
-    gcloud compute region-autoscalers update "$PRIMARY_AUTOSCALER" \
-        --region="$PRIMARY_REGION" \
-        --project="$PROJECT_ID" \
-        --mode=off \
-        --quiet 2>/dev/null || log_warning "Could not disable primary autoscaler"
-fi
-
-if [ -n "$STANDBY_AUTOSCALER" ]; then
-    log_info "  Disabling standby autoscaler: $STANDBY_AUTOSCALER"
-    gcloud compute region-autoscalers update "$STANDBY_AUTOSCALER" \
-        --region="$STANDBY_REGION" \
-        --project="$PROJECT_ID" \
-        --mode=off \
-        --quiet 2>/dev/null || log_warning "Could not disable standby autoscaler"
-fi
+    --quiet 2>/dev/null || log_warning "  Standby autoscaler not found or already stopped"
 
 log_success "Autoscalers disabled"
 echo ""
