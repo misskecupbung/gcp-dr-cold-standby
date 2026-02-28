@@ -187,22 +187,26 @@ fi
 # Step 3: Switch URL map back to primary backend
 log_step "Step 3: Switching load balancer to primary region..."
 
-# Get URL map and backend service names
+# Get URL map name
 URL_MAP=$(gcloud compute url-maps list --project="$PROJECT_ID" --filter="name~dr-url-map" --format="value(name)" | head -1)
-PRIMARY_BACKEND=$(gcloud compute backend-services list --global --project="$PROJECT_ID" --filter="name~primary" --format="value(name)" | head -1)
 
-if [ -n "$URL_MAP" ] && [ -n "$PRIMARY_BACKEND" ]; then
+if [ -n "$URL_MAP" ]; then
     log_info "  URL Map: $URL_MAP"
-    log_info "  Primary Backend: $PRIMARY_BACKEND"
     
-    gcloud compute url-maps set-default-service "$URL_MAP" \
-        --default-service="$PRIMARY_BACKEND" \
-        --global \
-        --project="$PROJECT_ID" \
-        --quiet
+    # Export, modify, and import URL map (handles path_matcher routing)
+    TEMP_FILE="/tmp/url-map-failback-$$.yaml"
+    gcloud compute url-maps export "$URL_MAP" --global --project="$PROJECT_ID" --destination="$TEMP_FILE" 2>/dev/null
+    
+    # Replace all standby backend references with primary
+    sed -i 's/dr-backend-standby/dr-backend-primary/g' "$TEMP_FILE"
+    
+    # Import the modified URL map
+    gcloud compute url-maps import "$URL_MAP" --global --project="$PROJECT_ID" --source="$TEMP_FILE" --quiet 2>/dev/null
+    
+    rm -f "$TEMP_FILE"
     log_success "Load balancer now pointing to primary region!"
 else
-    log_error "Could not find URL map or primary backend service"
+    log_error "Could not find URL map"
 fi
 
 # Step 4: Verify primary is serving traffic
