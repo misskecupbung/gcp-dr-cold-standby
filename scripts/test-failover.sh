@@ -101,11 +101,13 @@ echo ""
 
 # Test 1: Verify primary region is running
 log_step "Test 1: Primary region health check"
-PRIMARY_COUNT=$(gcloud compute instance-groups managed list-instances "$PRIMARY_MIG" \
+PRIMARY_INSTANCES=$(gcloud compute instance-groups managed list-instances "$PRIMARY_MIG" \
     --region="$PRIMARY_REGION" \
     --project="$PROJECT_ID" \
-    --filter="status=RUNNING" \
-    --format="value(instance)" 2>/dev/null | wc -l | tr -d ' ')
+    --format="value(status)" 2>/dev/null || echo "")
+PRIMARY_COUNT=$(echo "$PRIMARY_INSTANCES" | grep -c "RUNNING" 2>/dev/null || echo "0")
+PRIMARY_COUNT=$(echo "$PRIMARY_COUNT" | tr -d '\n' | tr -d ' ')
+PRIMARY_COUNT=${PRIMARY_COUNT:-0}
 
 if [ "$PRIMARY_COUNT" -ge 1 ]; then
     record_test "pass" "Primary region has $PRIMARY_COUNT running instances"
@@ -136,10 +138,17 @@ fi
 
 # Test 4: Verify standby is in cold state
 log_step "Test 4: Standby region cold state verification"
-STANDBY_COUNT=$(gcloud compute instance-groups managed list-instances "$STANDBY_MIG" \
+STANDBY_INSTANCES=$(gcloud compute instance-groups managed list-instances "$STANDBY_MIG" \
     --region="$STANDBY_REGION" \
     --project="$PROJECT_ID" \
-    --format="value(instance)" 2>/dev/null | wc -l | tr -d ' ')
+    --format="value(instance)" 2>/dev/null || echo "")
+if [ -z "$STANDBY_INSTANCES" ]; then
+    STANDBY_COUNT=0
+else
+    STANDBY_COUNT=$(echo "$STANDBY_INSTANCES" | grep -c . 2>/dev/null || echo "0")
+fi
+STANDBY_COUNT=$(echo "$STANDBY_COUNT" | tr -d '\n' | tr -d ' ')
+STANDBY_COUNT=${STANDBY_COUNT:-0}
 
 if [ "$STANDBY_COUNT" -eq 0 ]; then
     record_test "pass" "Standby region is in cold state (0 instances)"
@@ -149,10 +158,17 @@ fi
 
 # Test 5: Verify snapshot policy exists
 log_step "Test 5: Snapshot policy validation"
-SNAPSHOT_COUNT=$(gcloud compute snapshots list \
+SNAPSHOT_LIST=$(gcloud compute snapshots list \
     --project="$PROJECT_ID" \
     --filter="labels.purpose=dr-cold-standby OR labels.managed-by=terraform" \
-    --format="value(name)" 2>/dev/null | wc -l | tr -d ' ')
+    --format="value(name)" 2>/dev/null || echo "")
+if [ -z "$SNAPSHOT_LIST" ]; then
+    SNAPSHOT_COUNT=0
+else
+    SNAPSHOT_COUNT=$(echo "$SNAPSHOT_LIST" | grep -c . 2>/dev/null || echo "0")
+fi
+SNAPSHOT_COUNT=$(echo "$SNAPSHOT_COUNT" | tr -d '\n' | tr -d ' ')
+SNAPSHOT_COUNT=${SNAPSHOT_COUNT:-0}
 
 if [ "$SNAPSHOT_COUNT" -ge 0 ]; then
     record_test "pass" "Found $SNAPSHOT_COUNT snapshots in the project"
@@ -183,10 +199,17 @@ if [ "$SIMULATE_FAILURE" = true ]; then
     
     # Verify primary is down
     log_step "Test 6: Verify primary failure simulation"
-    PRIMARY_COUNT=$(gcloud compute instance-groups managed list-instances "$PRIMARY_MIG" \
+    PRIMARY_LIST=$(gcloud compute instance-groups managed list-instances "$PRIMARY_MIG" \
         --region="$PRIMARY_REGION" \
         --project="$PROJECT_ID" \
-        --format="value(instance)" 2>/dev/null | wc -l | tr -d ' ')
+        --format="value(instance)" 2>/dev/null || echo "")
+    if [ -z "$PRIMARY_LIST" ]; then
+        PRIMARY_COUNT=0
+    else
+        PRIMARY_COUNT=$(echo "$PRIMARY_LIST" | grep -c . 2>/dev/null || echo "0")
+    fi
+    PRIMARY_COUNT=$(echo "$PRIMARY_COUNT" | tr -d '\n' | tr -d ' ')
+    PRIMARY_COUNT=${PRIMARY_COUNT:-0}
     
     if [ "$PRIMARY_COUNT" -eq 0 ]; then
         record_test "pass" "Primary region successfully stopped"
@@ -214,11 +237,13 @@ if [ "$SIMULATE_FAILURE" = true ]; then
     ELAPSED=0
     
     while [ $ELAPSED -lt $MAX_WAIT ]; do
-        STANDBY_COUNT=$(gcloud compute instance-groups managed list-instances "$STANDBY_MIG" \
+        STANDBY_LIST=$(gcloud compute instance-groups managed list-instances "$STANDBY_MIG" \
             --region="$STANDBY_REGION" \
             --project="$PROJECT_ID" \
-            --filter="status=RUNNING" \
-            --format="value(instance)" 2>/dev/null | wc -l | tr -d ' ')
+            --format="value(status)" 2>/dev/null || echo "")
+        STANDBY_COUNT=$(echo "$STANDBY_LIST" | grep -c "RUNNING" 2>/dev/null || echo "0")
+        STANDBY_COUNT=$(echo "$STANDBY_COUNT" | tr -d '\n' | tr -d ' ')
+        STANDBY_COUNT=${STANDBY_COUNT:-0}
         
         if [ "$STANDBY_COUNT" -ge 2 ]; then
             break
@@ -293,11 +318,13 @@ if [ "$SIMULATE_FAILURE" = true ]; then
         
         ELAPSED=0
         while [ $ELAPSED -lt $MAX_WAIT ]; do
-            PRIMARY_COUNT=$(gcloud compute instance-groups managed list-instances "$PRIMARY_MIG" \
+            PRIMARY_LIST=$(gcloud compute instance-groups managed list-instances "$PRIMARY_MIG" \
                 --region="$PRIMARY_REGION" \
                 --project="$PROJECT_ID" \
-                --filter="status=RUNNING" \
-                --format="value(instance)" 2>/dev/null | wc -l | tr -d ' ')
+                --format="value(status)" 2>/dev/null || echo "")
+            PRIMARY_COUNT=$(echo "$PRIMARY_LIST" | grep -c "RUNNING" 2>/dev/null || echo "0")
+            PRIMARY_COUNT=$(echo "$PRIMARY_COUNT" | tr -d '\n' | tr -d ' ')
+            PRIMARY_COUNT=${PRIMARY_COUNT:-0}
             
             if [ "$PRIMARY_COUNT" -ge 2 ]; then
                 break
@@ -372,7 +399,13 @@ echo "  Test Duration:    ${TEST_DURATION} seconds"
 echo "  Tests Passed:     $TESTS_PASSED"
 echo "  Tests Failed:     $TESTS_FAILED"
 echo "  Total Tests:      $TESTS_TOTAL"
-echo "  Success Rate:     $(echo "scale=1; $TESTS_PASSED * 100 / $TESTS_TOTAL" | bc)%"
+# Calculate percentage without bc (integer math)
+if [ "$TESTS_TOTAL" -gt 0 ]; then
+    SUCCESS_RATE=$((TESTS_PASSED * 100 / TESTS_TOTAL))
+else
+    SUCCESS_RATE=0
+fi
+echo "  Success Rate:     ${SUCCESS_RATE}%"
 echo ""
 
 if [ "$SIMULATE_FAILURE" = true ]; then
@@ -393,7 +426,7 @@ Project: $PROJECT_ID
 - Tests Passed: $TESTS_PASSED
 - Tests Failed: $TESTS_FAILED
 - Total Tests: $TESTS_TOTAL
-- Success Rate: $(echo "scale=1; $TESTS_PASSED * 100 / $TESTS_TOTAL" | bc)%
+- Success Rate: ${SUCCESS_RATE}%
 - Test Duration: ${TEST_DURATION}s
 
 ## Recovery Metrics
