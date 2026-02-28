@@ -157,13 +157,25 @@ WAIT_INTERVAL=15
 ELAPSED=0
 
 while [ $ELAPSED -lt $MAX_WAIT ]; do
-    # Count instances with RUNNING status using filter and wc -l
-    HEALTHY_COUNT=$(gcloud compute instance-groups managed list-instances "$PRIMARY_MIG" \
+    # Get running count from MIG status
+    MIG_STATUS=$(gcloud compute instance-groups managed describe "$PRIMARY_MIG" \
         --region="$PRIMARY_REGION" \
         --project="$PROJECT_ID" \
-        --filter="status=RUNNING" \
-        --format="value(name)" 2>/dev/null | wc -l | tr -d ' ')
-    HEALTHY_COUNT=${HEALTHY_COUNT:-0}
+        --format="value(status.isStable,targetSize)" 2>/dev/null)
+    IS_STABLE=$(echo "$MIG_STATUS" | cut -f1)
+    TARGET_SIZE=$(echo "$MIG_STATUS" | cut -f2)
+    
+    # Check if stable (all instances running)
+    if [ "$IS_STABLE" = "True" ] && [ "$TARGET_SIZE" = "$PRIMARY_SIZE" ]; then
+        HEALTHY_COUNT=$PRIMARY_SIZE
+        log_success "All $PRIMARY_SIZE instances are running!"
+        break
+    fi
+    
+    # Get actual running count by listing instances
+    HEALTHY_COUNT=$(gcloud compute instance-groups managed list-instances "$PRIMARY_MIG" \
+        --region="$PRIMARY_REGION" \
+        --project="$PROJECT_ID" 2>/dev/null | grep -c "RUNNING" || echo 0)
     
     if [ "$HEALTHY_COUNT" -ge "$PRIMARY_SIZE" ]; then
         log_success "All $PRIMARY_SIZE instances are running!"
