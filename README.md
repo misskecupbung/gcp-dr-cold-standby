@@ -55,7 +55,7 @@ gcp-dr-cold-standby/
 ### 1. Clone and Configure
 
 ```bash
-git clone https://github.com/your-org/gcp-dr-cold-standby.git
+git clone https://github.com/misskecupbung/gcp-dr-cold-standby.git
 cd gcp-dr-cold-standby
 
 cp terraform/terraform.tfvars.example terraform/terraform.tfvars
