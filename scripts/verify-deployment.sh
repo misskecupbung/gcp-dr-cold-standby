@@ -46,38 +46,37 @@ echo ""
 
 # Check Primary MIG
 log_info "Checking Primary Instance Group..."
-PRIMARY_INSTANCES=$(gcloud compute instance-groups managed list-instances "$PRIMARY_MIG" \
+PRIMARY_COUNT=$(gcloud compute instance-groups managed list-instances "$PRIMARY_MIG" \
     --region="$PRIMARY_REGION" \
     --project="$PROJECT_ID" \
-    --format="table(instance,status,lastAttempt.errors)" 2>/dev/null)
+    --format="value(instance)" 2>/dev/null | wc -l | tr -d ' ')
 
-if [ -n "$PRIMARY_INSTANCES" ]; then
-    echo "$PRIMARY_INSTANCES"
-    PRIMARY_COUNT=$(echo "$PRIMARY_INSTANCES" | grep -c "RUNNING" 2>/dev/null || true)
-    PRIMARY_COUNT=${PRIMARY_COUNT:-0}
-    if [ "$PRIMARY_COUNT" -ge 1 ] 2>/dev/null; then
-        log_success "Primary MIG: $PRIMARY_COUNT instances running"
-    else
-        log_warning "Primary MIG: No running instances"
-    fi
+if [ "$PRIMARY_COUNT" -ge 1 ] 2>/dev/null; then
+    log_success "Primary MIG: $PRIMARY_COUNT instances running"
+    gcloud compute instance-groups managed list-instances "$PRIMARY_MIG" \
+        --region="$PRIMARY_REGION" \
+        --project="$PROJECT_ID" \
+        --format="table(instance.basename(),zone.basename(),instanceStatus)" 2>/dev/null
 else
-    log_error "Primary MIG: Could not retrieve instances"
+    log_warning "Primary MIG: No running instances"
 fi
 echo ""
 
 # Check Standby MIG
 log_info "Checking Standby Instance Group..."
-STANDBY_INSTANCES=$(gcloud compute instance-groups managed list-instances "$STANDBY_MIG" \
+STANDBY_COUNT=$(gcloud compute instance-groups managed list-instances "$STANDBY_MIG" \
     --region="$STANDBY_REGION" \
     --project="$PROJECT_ID" \
-    --format="table(instance,status)" 2>/dev/null)
+    --format="value(instance)" 2>/dev/null | wc -l | tr -d ' ')
 
-STANDBY_COUNT=$(echo "$STANDBY_INSTANCES" | grep -c "RUNNING" 2>/dev/null || true)
-STANDBY_COUNT=${STANDBY_COUNT:-0}
 if [ "$STANDBY_COUNT" -eq 0 ] 2>/dev/null; then
     log_success "Standby MIG: Cold standby (0 instances) - as expected"
 else
     log_warning "Standby MIG: $STANDBY_COUNT instances (expected: 0 for cold standby)"
+    gcloud compute instance-groups managed list-instances "$STANDBY_MIG" \
+        --region="$STANDBY_REGION" \
+        --project="$PROJECT_ID" \
+        --format="table(instance.basename(),zone.basename(),instanceStatus)" 2>/dev/null
 fi
 echo ""
 
