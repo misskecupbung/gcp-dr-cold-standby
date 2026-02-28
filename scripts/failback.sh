@@ -175,7 +175,11 @@ while [ $ELAPSED -lt $MAX_WAIT ]; do
     # Get actual running count by listing instances
     HEALTHY_COUNT=$(gcloud compute instance-groups managed list-instances "$PRIMARY_MIG" \
         --region="$PRIMARY_REGION" \
-        --project="$PROJECT_ID" 2>/dev/null | grep -c "RUNNING" || echo 0)
+        --project="$PROJECT_ID" \
+        --format="value(status)" 2>/dev/null | grep -c "RUNNING" || echo 0)
+    # Ensure HEALTHY_COUNT is a valid integer
+    HEALTHY_COUNT=$(echo "$HEALTHY_COUNT" | tr -d '\n' | head -1)
+    HEALTHY_COUNT=${HEALTHY_COUNT:-0}
     
     if [ "$HEALTHY_COUNT" -ge "$PRIMARY_SIZE" ]; then
         log_success "All $PRIMARY_SIZE instances are running!"
