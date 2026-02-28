@@ -1,7 +1,5 @@
 # GCP Disaster Recovery: Cold Standby Architecture
 
-> **Estimated Lab Time: 45 minutes**
-
 A production-ready hands-on lab demonstrating **Cold Standby Disaster Recovery** on Google Cloud Platform. This lab covers automated backup, snapshot management, and failover mechanisms using Cloud DNS, Load Balancing, Managed Instance Groups, and Persistent Disk Snapshots.
 
 ## Architecture Overview
