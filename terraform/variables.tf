@@ -78,13 +78,13 @@ variable "machine_type_heartbeat" {
 variable "boot_disk_size" {
   description = "Size of boot disk in GB"
   type        = number
-  default     = 20
+  default     = 10
 }
 
 variable "data_disk_size" {
   description = "Size of data disk in GB"
   type        = number
-  default     = 100
+  default     = 10
 }
 
 variable "image_family" {
