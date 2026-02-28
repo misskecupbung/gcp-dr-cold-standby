@@ -97,10 +97,10 @@ resource "google_compute_region_instance_group_manager" "heartbeat_primary" {
   }
 
   update_policy {
-    type                  = "PROACTIVE"
-    minimal_action        = "REPLACE"
-    max_surge_fixed       = 0
-    max_unavailable_fixed = 1
+    type                         = "PROACTIVE"
+    minimal_action               = "REPLACE"
+    max_surge_percent            = 100
+    max_unavailable_percent      = 100
   }
 }
 
@@ -179,10 +179,10 @@ resource "google_compute_region_instance_group_manager" "heartbeat_standby" {
   }
 
   update_policy {
-    type                  = "PROACTIVE"
-    minimal_action        = "REPLACE"
-    max_surge_fixed       = 0
-    max_unavailable_fixed = 1
+    type                         = "PROACTIVE"
+    minimal_action               = "REPLACE"
+    max_surge_percent            = 100
+    max_unavailable_percent      = 100
   }
 }
 
