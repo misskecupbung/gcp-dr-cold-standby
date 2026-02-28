@@ -96,12 +96,7 @@ resource "google_compute_region_instance_group_manager" "heartbeat_primary" {
     initial_delay_sec = 300
   }
 
-  update_policy {
-    type                         = "PROACTIVE"
-    minimal_action               = "REPLACE"
-    max_surge_percent            = 100
-    max_unavailable_percent      = 100
-  }
+  # No update_policy needed for small regional MIG
 }
 
 # =============================================================================
@@ -178,12 +173,7 @@ resource "google_compute_region_instance_group_manager" "heartbeat_standby" {
     initial_delay_sec = 300
   }
 
-  update_policy {
-    type                         = "PROACTIVE"
-    minimal_action               = "REPLACE"
-    max_surge_percent            = 100
-    max_unavailable_percent      = 100
-  }
+  # No update_policy needed for small regional MIG
 }
 
 # =============================================================================
