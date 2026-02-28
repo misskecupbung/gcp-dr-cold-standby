@@ -62,7 +62,7 @@ resource "google_monitoring_alert_policy" "primary_down" {
     display_name = "Primary MIG Instance Count Low"
 
     condition_threshold {
-      filter          = "resource.type = \"gce_instance_group_manager\" AND resource.labels.instance_group_manager_name = \"${var.primary_mig_name}\" AND metric.type = \"compute.googleapis.com/instance_group/size\""
+      filter          = "metric.type=\"compute.googleapis.com/instance_group/size\" AND resource.type=\"instance_group\" AND metadata.user_labels.\"environment\"=\"${var.environment}\""
       duration        = "300s"
       comparison      = "COMPARISON_LT"
       threshold_value = 1
@@ -182,44 +182,12 @@ resource "google_monitoring_dashboard" "dr_dashboard" {
       columns = "2"
       widgets = [
         {
-          title = "Primary Region Instance Count"
-          xyChart = {
-            dataSets = [{
-              timeSeriesQuery = {
-                timeSeriesFilter = {
-                  filter = "resource.type = \"gce_instance_group_manager\" AND resource.labels.instance_group_manager_name = \"${var.primary_mig_name}\""
-                  aggregation = {
-                    alignmentPeriod    = "60s"
-                    perSeriesAligner   = "ALIGN_MEAN"
-                  }
-                }
-              }
-            }]
-          }
-        },
-        {
-          title = "Standby Region Instance Count"
-          xyChart = {
-            dataSets = [{
-              timeSeriesQuery = {
-                timeSeriesFilter = {
-                  filter = "resource.type = \"gce_instance_group_manager\" AND resource.labels.instance_group_manager_name = \"${var.standby_mig_name}\""
-                  aggregation = {
-                    alignmentPeriod    = "60s"
-                    perSeriesAligner   = "ALIGN_MEAN"
-                  }
-                }
-              }
-            }]
-          }
-        },
-        {
           title = "Load Balancer Request Count"
           xyChart = {
             dataSets = [{
               timeSeriesQuery = {
                 timeSeriesFilter = {
-                  filter = "resource.type = \"https_lb_rule\" AND metric.type = \"loadbalancing.googleapis.com/https/request_count\""
+                  filter = "metric.type=\"loadbalancing.googleapis.com/https/request_count\" resource.type=\"https_lb_rule\""
                   aggregation = {
                     alignmentPeriod    = "60s"
                     perSeriesAligner   = "ALIGN_RATE"
@@ -235,7 +203,7 @@ resource "google_monitoring_dashboard" "dr_dashboard" {
             dataSets = [{
               timeSeriesQuery = {
                 timeSeriesFilter = {
-                  filter = "resource.type = \"https_lb_rule\" AND metric.type = \"loadbalancing.googleapis.com/https/total_latencies\""
+                  filter = "metric.type=\"loadbalancing.googleapis.com/https/total_latencies\" resource.type=\"https_lb_rule\""
                   aggregation = {
                     alignmentPeriod    = "60s"
                     perSeriesAligner   = "ALIGN_PERCENTILE_99"
@@ -251,7 +219,7 @@ resource "google_monitoring_dashboard" "dr_dashboard" {
             dataSets = [{
               timeSeriesQuery = {
                 timeSeriesFilter = {
-                  filter = "resource.type = \"uptime_url\" AND metric.type = \"monitoring.googleapis.com/uptime_check/check_passed\""
+                  filter = "metric.type=\"monitoring.googleapis.com/uptime_check/check_passed\" resource.type=\"uptime_url\""
                   aggregation = {
                     alignmentPeriod    = "60s"
                     perSeriesAligner   = "ALIGN_FRACTION_TRUE"
@@ -262,14 +230,14 @@ resource "google_monitoring_dashboard" "dr_dashboard" {
           }
         },
         {
-          title = "Snapshot Count"
+          title = "VM CPU Utilization"
           xyChart = {
             dataSets = [{
               timeSeriesQuery = {
                 timeSeriesFilter = {
-                  filter = "resource.type = \"gce_disk\" AND metric.type = \"compute.googleapis.com/storage/snapshot_count\""
+                  filter = "metric.type=\"compute.googleapis.com/instance/cpu/utilization\" resource.type=\"gce_instance\""
                   aggregation = {
-                    alignmentPeriod    = "300s"
+                    alignmentPeriod    = "60s"
                     perSeriesAligner   = "ALIGN_MEAN"
                   }
                 }
