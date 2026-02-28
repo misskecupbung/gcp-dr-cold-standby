@@ -31,6 +31,11 @@ output "dns_name_servers" {
 output "application_url" {
   description = "Application URL using domain name"
   value       = var.enable_dns ? "http://${trimsuffix(var.domain_name, ".")}" : "http://${module.load_balancing.lb_ip_address}"
+}
+
+# -----------------------------------------------------------------------------
+# Compute Outputs - Primary Region
+# -----------------------------------------------------------------------------
 output "primary_mig_name" {
   description = "Primary region Managed Instance Group name"
   value       = module.compute_primary.mig_name
