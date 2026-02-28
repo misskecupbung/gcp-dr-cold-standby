@@ -56,7 +56,7 @@ if [ "$PRIMARY_COUNT" -ge 1 ] 2>/dev/null; then
     gcloud compute instance-groups managed list-instances "$PRIMARY_MIG" \
         --region="$PRIMARY_REGION" \
         --project="$PROJECT_ID" \
-        --format="table(instance.basename(),zone.basename(),instanceStatus)" 2>/dev/null
+        --format="table[box](instance.scope(instances):label=INSTANCE,zone.scope(zones):label=ZONE,instanceStatus:label=STATUS)" 2>/dev/null
 else
     log_warning "Primary MIG: No running instances"
 fi
@@ -76,7 +76,7 @@ else
     gcloud compute instance-groups managed list-instances "$STANDBY_MIG" \
         --region="$STANDBY_REGION" \
         --project="$PROJECT_ID" \
-        --format="table(instance.basename(),zone.basename(),instanceStatus)" 2>/dev/null
+        --format="table[box](instance.scope(instances):label=INSTANCE,zone.scope(zones):label=ZONE,instanceStatus:label=STATUS)" 2>/dev/null
 fi
 echo ""
 
