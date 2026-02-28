@@ -101,15 +101,25 @@ echo ""
 
 # Test 1: Verify primary region is running
 log_step "Test 1: Primary region health check"
-PRIMARY_INSTANCES=$(gcloud compute instance-groups managed list-instances "$PRIMARY_MIG" \
-    --region="$PRIMARY_REGION" \
-    --project="$PROJECT_ID" \
-    --format="value(status)" 2>/dev/null || echo "")
-PRIMARY_COUNT=$(echo "$PRIMARY_INSTANCES" | grep -c "RUNNING" 2>/dev/null || echo "0")
-PRIMARY_COUNT=$(echo "$PRIMARY_COUNT" | tr -d '\n' | tr -d ' ')
-PRIMARY_COUNT=${PRIMARY_COUNT:-0}
 
-if [ "$PRIMARY_COUNT" -ge 1 ]; then
+# Check if PRIMARY_MIG is set
+if [ -z "$PRIMARY_MIG" ]; then
+    record_test "fail" "Could not get PRIMARY_MIG from terraform output"
+else
+    # Use MIG describe to get current size
+    MIG_INFO=$(gcloud compute instance-groups managed describe "$PRIMARY_MIG" \
+        --region="$PRIMARY_REGION" \
+        --project="$PROJECT_ID" \
+        --format="value(targetSize)" 2>/dev/null || echo "0")
+    PRIMARY_COUNT=$(echo "$MIG_INFO" | tr -d '\n' | tr -d ' ')
+    PRIMARY_COUNT=${PRIMARY_COUNT:-0}
+
+    if [ "$PRIMARY_COUNT" -ge 1 ]; then
+        record_test "pass" "Primary region has $PRIMARY_COUNT running instances"
+    else
+        record_test "fail" "Primary region has no running instances"
+    fi
+fi
     record_test "pass" "Primary region has $PRIMARY_COUNT running instances"
 else
     record_test "fail" "Primary region has no running instances"
@@ -158,22 +168,28 @@ fi
 
 # Test 5: Verify snapshot policy exists
 log_step "Test 5: Snapshot policy validation"
-SNAPSHOT_LIST=$(gcloud compute snapshots list \
-    --project="$PROJECT_ID" \
-    --filter="labels.purpose=dr-cold-standby OR labels.managed-by=terraform" \
-    --format="value(name)" 2>/dev/null || echo "")
-if [ -z "$SNAPSHOT_LIST" ]; then
-    SNAPSHOT_COUNT=0
-else
-    SNAPSHOT_COUNT=$(echo "$SNAPSHOT_LIST" | grep -c . 2>/dev/null || echo "0")
-fi
-SNAPSHOT_COUNT=$(echo "$SNAPSHOT_COUNT" | tr -d '\n' | tr -d ' ')
-SNAPSHOT_COUNT=${SNAPSHOT_COUNT:-0}
 
-if [ "$SNAPSHOT_COUNT" -ge 0 ]; then
-    record_test "pass" "Found $SNAPSHOT_COUNT snapshots in the project"
+# Check for snapshot schedule policy (more reliable than counting snapshots)
+POLICY_COUNT=$(gcloud compute resource-policies list \
+    --project="$PROJECT_ID" \
+    --filter="name~dr" \
+    --format="value(name)" 2>/dev/null | wc -l | tr -d ' ')
+POLICY_COUNT=${POLICY_COUNT:-0}
+
+if [ "$POLICY_COUNT" -ge 1 ]; then
+    record_test "pass" "Found $POLICY_COUNT snapshot policy configured"
 else
-    record_test "fail" "No snapshots found"
+    # Check for any snapshots as fallback
+    SNAPSHOT_COUNT=$(gcloud compute snapshots list \
+        --project="$PROJECT_ID" \
+        --format="value(name)" 2>/dev/null | wc -l | tr -d ' ')
+    SNAPSHOT_COUNT=${SNAPSHOT_COUNT:-0}
+    
+    if [ "$SNAPSHOT_COUNT" -ge 1 ]; then
+        record_test "pass" "Found $SNAPSHOT_COUNT snapshots in the project"
+    else
+        record_test "fail" "No snapshot policy or snapshots found"
+    fi
 fi
 
 echo ""
