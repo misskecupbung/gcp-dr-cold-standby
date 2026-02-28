@@ -20,22 +20,17 @@ output "load_balancer_url" {
 # -----------------------------------------------------------------------------
 output "dns_zone_name" {
   description = "Cloud DNS managed zone name"
-  value       = module.dns.zone_name
+  value       = var.enable_dns ? module.dns[0].zone_name : "DNS disabled"
 }
 
 output "dns_name_servers" {
   description = "DNS name servers for the zone"
-  value       = module.dns.name_servers
+  value       = var.enable_dns ? module.dns[0].name_servers : []
 }
 
 output "application_url" {
   description = "Application URL using domain name"
-  value       = "http://${trimsuffix(var.domain_name, ".")}"
-}
-
-# -----------------------------------------------------------------------------
-# Compute Outputs - Primary Region
-# -----------------------------------------------------------------------------
+  value       = var.enable_dns ? "http://${trimsuffix(var.domain_name, ".")}" : "http://${module.load_balancing.lb_ip_address}"
 output "primary_mig_name" {
   description = "Primary region Managed Instance Group name"
   value       = module.compute_primary.mig_name
@@ -72,14 +67,14 @@ output "standby_instance_template" {
 # -----------------------------------------------------------------------------
 # Heartbeat Outputs
 # -----------------------------------------------------------------------------
-output "heartbeat_instance_name" {
-  description = "Heartbeat monitoring instance name"
-  value       = module.heartbeat.instance_name
+output "heartbeat_primary_mig" {
+  description = "Heartbeat primary MIG self link"
+  value       = module.heartbeat.heartbeat_primary_mig
 }
 
-output "heartbeat_instance_ip" {
-  description = "Heartbeat instance internal IP"
-  value       = module.heartbeat.instance_internal_ip
+output "heartbeat_standby_mig" {
+  description = "Heartbeat standby MIG self link"
+  value       = module.heartbeat.heartbeat_standby_mig
 }
 
 # -----------------------------------------------------------------------------
@@ -127,12 +122,11 @@ output "monitoring_dashboard_url" {
 output "helpful_commands" {
   description = "Useful commands for managing the DR setup"
   value = {
-    test_lb          = "curl -H 'Host: ${trimsuffix(var.domain_name, ".")}' http://${module.load_balancing.lb_ip_address}/health"
+    test_lb          = "curl http://${module.load_balancing.lb_ip_address}/health"
     check_primary    = "gcloud compute instance-groups managed list-instances ${module.compute_primary.mig_name} --region=${var.primary_region}"
     check_standby    = "gcloud compute instance-groups managed list-instances ${module.compute_standby.mig_name} --region=${var.standby_region}"
     scale_up_standby = "gcloud compute instance-groups managed resize ${module.compute_standby.mig_name} --size=2 --region=${var.standby_region}"
     list_snapshots   = "gcloud compute snapshots list --filter='labels.purpose=dr-cold-standby'"
-    ssh_heartbeat    = "gcloud compute ssh ${module.heartbeat.instance_name} --zone=${var.primary_zone}"
   }
 }
 

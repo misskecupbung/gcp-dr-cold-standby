@@ -24,8 +24,12 @@ resource "google_compute_resource_policy" "snapshot_schedule" {
     }
 
     snapshot_properties {
-      labels            = var.labels
-      storage_locations = var.snapshot_storage_locations
+      labels = {
+        environment = var.environment
+        managed-by  = "terraform"
+        purpose     = "dr-cold-standby"
+      }
+      storage_locations = [var.standby_region]
       guest_flush       = false
     }
   }
@@ -55,5 +59,9 @@ resource "google_storage_bucket" "snapshot_metadata" {
     }
   }
 
-  labels = var.labels
+  labels = {
+    environment = var.environment
+    managed-by  = "terraform"
+    purpose     = "dr-cold-standby"
+  }
 }
