@@ -59,10 +59,6 @@ resource "google_compute_instance_template" "app" {
     auto_delete  = false
     boot         = false
     device_name  = "data-disk"
-    
-    disk_encryption_key {
-      kms_key_self_link = null  # Use Google-managed keys
-    }
   }
 
   network_interface {
