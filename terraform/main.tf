@@ -182,8 +182,8 @@ module "load_balancing" {
   project_id              = var.project_id
   primary_region          = var.primary_region
   standby_region          = var.standby_region
-  primary_mig_id          = module.compute_primary.mig_id
-  standby_mig_id          = module.compute_standby.mig_id
+  primary_mig_id          = module.compute_primary.instance_group
+  standby_mig_id          = module.compute_standby.instance_group
   health_check_port       = var.health_check_port
   health_check_path       = var.health_check_path
   health_check_interval   = var.health_check_interval

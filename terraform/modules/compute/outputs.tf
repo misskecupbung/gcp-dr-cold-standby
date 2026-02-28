@@ -17,6 +17,11 @@ output "mig_self_link" {
   value       = google_compute_region_instance_group_manager.app.self_link
 }
 
+output "instance_group" {
+  description = "The instance group URL for use with load balancer backend services"
+  value       = google_compute_region_instance_group_manager.app.instance_group
+}
+
 output "instance_template_id" {
   description = "The ID of the instance template"
   value       = google_compute_instance_template.app.id
