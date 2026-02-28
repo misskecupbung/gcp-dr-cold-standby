@@ -1,0 +1,62 @@
+# =============================================================================
+# Example Terraform Variables - Copy to terraform.tfvars and customize
+# =============================================================================
+
+# Project Configuration (REQUIRED)
+project_id   = "your-gcp-project-id"
+project_name = "DR Cold Standby Lab"
+
+# Region Configuration
+primary_region  = "us-central1"
+primary_zone    = "us-central1-a"
+standby_region  = "us-east1"
+standby_zone    = "us-east1-b"
+
+# Networking Configuration
+network_name        = "dr-vpc"
+primary_subnet_cidr = "10.0.1.0/24"
+standby_subnet_cidr = "10.0.2.0/24"
+
+# Compute Configuration
+machine_type_serving   = "n2-standard-2"
+machine_type_heartbeat = "e2-small"
+boot_disk_size         = 20
+data_disk_size         = 100
+
+# Instance Group Configuration
+primary_min_replicas   = 2
+primary_max_replicas   = 5
+standby_min_replicas   = 0  # Cold standby - no instances running
+standby_max_replicas   = 5
+target_cpu_utilization = 0.7
+
+# Health Check Configuration
+health_check_port     = 8080
+health_check_path     = "/health"
+health_check_interval = 10
+health_check_timeout  = 5
+healthy_threshold     = 2
+unhealthy_threshold   = 3
+
+# DNS Configuration
+dns_zone_name = "dr-lab-zone"
+domain_name   = "dr-lab.example.com."  # Must end with a dot
+dns_ttl       = 300
+
+# Snapshot Configuration
+snapshot_schedule_hours    = 1
+snapshot_retention_days    = 7
+snapshot_storage_locations = ["us"]
+
+# Monitoring Configuration
+enable_monitoring    = true
+notification_email   = "your-email@example.com"
+uptime_check_period  = "60s"
+
+# Labels
+environment = "lab"
+labels = {
+  managed-by = "terraform"
+  purpose    = "dr-lab"
+  owner      = "your-name"
+}

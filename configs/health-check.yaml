@@ -1,0 +1,52 @@
+# =============================================================================
+# Health Check Configuration
+# Apply with: gcloud compute health-checks create http dr-health-check --config-file=health-check.yaml
+# =============================================================================
+
+# This YAML represents the health check configuration deployed by Terraform
+# Use this as reference for manual health check creation or modifications
+
+name: dr-health-check
+description: "Health check for DR Cold Standby Lab application"
+
+# Health check type
+type: HTTP
+
+# HTTP specific settings
+httpHealthCheck:
+  port: 8080
+  requestPath: "/health"
+  proxyHeader: NONE
+  response: ""  # Any 2xx response is considered healthy
+
+# Timing settings
+checkIntervalSec: 10        # How often to check
+timeoutSec: 5               # How long to wait for response
+healthyThreshold: 2         # Consecutive successes to mark healthy
+unhealthyThreshold: 3       # Consecutive failures to mark unhealthy
+
+# Logging
+logConfig:
+  enable: true
+
+---
+# Regional Health Check for Auto-healing
+# =============================================================================
+
+name: dr-autohealing-health-check
+description: "Health check for MIG auto-healing"
+
+type: HTTP
+
+httpHealthCheck:
+  port: 8080
+  requestPath: "/health"
+  proxyHeader: NONE
+
+checkIntervalSec: 30        # Less frequent for auto-healing
+timeoutSec: 10
+healthyThreshold: 1         # Quick recovery detection
+unhealthyThreshold: 3       # Give instances time before marking unhealthy
+
+logConfig:
+  enable: true

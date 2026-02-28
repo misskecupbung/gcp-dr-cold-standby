@@ -1,0 +1,234 @@
+# =============================================================================
+# Cloud Monitoring Alerting Policies
+# Reference configuration for DR alerting
+# =============================================================================
+
+# These policies are created by Terraform but documented here for reference
+# Manual creation: gcloud alpha monitoring policies create --policy-from-file=alerting-policy.yaml
+
+---
+# Alert 1: Primary Region Instance Count Low
+# =============================================================================
+displayName: "DR Lab - Primary Region Unhealthy"
+documentation:
+  content: |
+    ## Primary Region Alert
+    
+    The primary region instance group has fewer instances than expected.
+    This could indicate:
+    - Instance failures
+    - Scaling issues
+    - Zone or region outage
+    
+    ### Actions:
+    1. Check instance group status in Cloud Console
+    2. Review instance logs for errors
+    3. If outage confirmed, initiate DR failover:
+       ```
+       ./scripts/failover.sh
+       ```
+  mimeType: text/markdown
+
+combiner: OR
+enabled: true
+
+conditions:
+  - displayName: "Primary MIG Instance Count Low"
+    conditionThreshold:
+      filter: >-
+        resource.type = "gce_instance_group_manager" AND
+        resource.labels.instance_group_manager_name = "${PRIMARY_MIG_NAME}" AND
+        metric.type = "compute.googleapis.com/instance_group/size"
+      comparison: COMPARISON_LT
+      thresholdValue: 1
+      duration: 300s
+      aggregations:
+        - alignmentPeriod: 60s
+          perSeriesAligner: ALIGN_MEAN
+      trigger:
+        count: 1
+
+alertStrategy:
+  autoClose: 1800s
+  notificationRateLimit:
+    period: 300s
+
+notificationChannels:
+  - projects/${PROJECT_ID}/notificationChannels/${EMAIL_CHANNEL_ID}
+
+---
+# Alert 2: Service Unavailable (Uptime Check Failed)
+# =============================================================================
+displayName: "DR Lab - Service Unavailable"
+documentation:
+  content: |
+    ## Service Unavailable Alert
+    
+    The application uptime check has failed. The service may be unavailable.
+    
+    ### Possible Causes:
+    - Load balancer issues
+    - Backend service failures
+    - Network connectivity problems
+    - Application errors
+    
+    ### Actions:
+    1. Check load balancer health in Cloud Console
+    2. Verify backend instances are healthy
+    3. Check application logs
+    4. If primary region is down, failover:
+       ```
+       ./scripts/failover.sh
+       ```
+  mimeType: text/markdown
+
+combiner: OR
+enabled: true
+
+conditions:
+  - displayName: "Uptime Check Failed"
+    conditionThreshold:
+      filter: >-
+        resource.type = "uptime_url" AND
+        metric.type = "monitoring.googleapis.com/uptime_check/check_passed"
+      comparison: COMPARISON_LT
+      thresholdValue: 1
+      duration: 300s
+      aggregations:
+        - alignmentPeriod: 60s
+          perSeriesAligner: ALIGN_FRACTION_TRUE
+          crossSeriesReducer: REDUCE_MEAN
+          groupByFields:
+            - resource.label.host
+      trigger:
+        count: 1
+
+alertStrategy:
+  autoClose: 1800s
+
+---
+# Alert 3: High Latency Warning
+# =============================================================================
+displayName: "DR Lab - High Latency"
+documentation:
+  content: |
+    ## High Latency Alert
+    
+    The application is experiencing high latency (>5 seconds p99).
+    
+    ### Possible Causes:
+    - High load on backend instances
+    - Database performance issues
+    - Network congestion
+    - Resource constraints
+    
+    ### Actions:
+    1. Check instance CPU and memory usage
+    2. Review recent deployments
+    3. Consider scaling up instances
+    4. If latency persists, consider failover to different region
+  mimeType: text/markdown
+
+combiner: OR
+enabled: true
+
+conditions:
+  - displayName: "Load Balancer High Latency"
+    conditionThreshold:
+      filter: >-
+        resource.type = "https_lb_rule" AND
+        metric.type = "loadbalancing.googleapis.com/https/total_latencies"
+      comparison: COMPARISON_GT
+      thresholdValue: 5000
+      duration: 300s
+      aggregations:
+        - alignmentPeriod: 60s
+          perSeriesAligner: ALIGN_PERCENTILE_99
+      trigger:
+        count: 1
+
+alertStrategy:
+  autoClose: 1800s
+
+---
+# Alert 4: Snapshot Failure
+# =============================================================================
+displayName: "DR Lab - Snapshot Policy Issues"
+documentation:
+  content: |
+    ## Snapshot Alert
+    
+    Snapshot policy may not be working correctly.
+    No new snapshots have been created recently.
+    
+    ### Actions:
+    1. Check snapshot schedule policy status
+    2. Verify disks are attached to the policy
+    3. Check for quota limits
+    4. Manually create snapshot if needed:
+       ```
+       ./scripts/heartbeat/snapshot-manager.sh create
+       ```
+  mimeType: text/markdown
+
+combiner: OR
+enabled: true
+
+conditions:
+  - displayName: "No Recent Snapshots"
+    conditionAbsent:
+      filter: >-
+        resource.type = "gce_disk" AND
+        metric.type = "compute.googleapis.com/storage/snapshot_count"
+      duration: 7200s  # 2 hours
+      aggregations:
+        - alignmentPeriod: 3600s
+          perSeriesAligner: ALIGN_MEAN
+
+alertStrategy:
+  autoClose: 3600s
+
+---
+# Alert 5: Standby Region Unexpectedly Active
+# =============================================================================
+displayName: "DR Lab - Standby Region Active"
+documentation:
+  content: |
+    ## Standby Region Alert
+    
+    The standby region has active instances when it should be in cold standby mode.
+    This could indicate:
+    - An ongoing failover
+    - Unexpected scaling
+    - Configuration drift
+    
+    ### Actions:
+    1. Verify if failover is in progress
+    2. Check if this is expected behavior
+    3. If not expected, scale down standby:
+       ```
+       gcloud compute instance-groups managed resize ${STANDBY_MIG} --size=0 --region=${STANDBY_REGION}
+       ```
+  mimeType: text/markdown
+
+combiner: OR
+enabled: true
+
+conditions:
+  - displayName: "Standby MIG Has Instances"
+    conditionThreshold:
+      filter: >-
+        resource.type = "gce_instance_group_manager" AND
+        resource.labels.instance_group_manager_name = "${STANDBY_MIG_NAME}" AND
+        metric.type = "compute.googleapis.com/instance_group/size"
+      comparison: COMPARISON_GT
+      thresholdValue: 0
+      duration: 600s
+      aggregations:
+        - alignmentPeriod: 60s
+          perSeriesAligner: ALIGN_MEAN
+      trigger:
+        count: 1
+
+alertStrategy:
+  autoClose: 3600s
