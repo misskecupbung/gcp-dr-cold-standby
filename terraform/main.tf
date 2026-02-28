@@ -218,15 +218,15 @@ module "monitoring" {
   count  = var.enable_monitoring ? 1 : 0
   source = "./modules/monitoring"
 
-  project_id           = var.project_id
-  notification_email   = var.notification_email
-  primary_mig_name     = module.compute_primary.mig_name
-  standby_mig_name     = module.compute_standby.mig_name
-  lb_ip_address        = module.load_balancing.lb_ip_address
-  domain_name          = var.domain_name
-  uptime_check_period  = var.uptime_check_period
-  health_check_port    = var.health_check_port
-  health_check_path    = var.health_check_path
+  project_id         = var.project_id
+  environment        = var.environment
+  primary_region     = var.primary_region
+  standby_region     = var.standby_region
+  notification_email = var.notification_email
+  primary_mig_name   = module.compute_primary.mig_name
+  standby_mig_name   = module.compute_standby.mig_name
+  lb_url             = "http://${module.load_balancing.lb_ip_address}/health"
+  uptime_check_period = var.uptime_check_period
 
   depends_on = [module.load_balancing, module.dns]
 }

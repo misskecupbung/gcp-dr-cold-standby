@@ -46,7 +46,6 @@ dns_ttl       = 300
 # Snapshot Configuration
 snapshot_schedule_hours    = 1
 snapshot_retention_days    = 7
-snapshot_storage_locations = ["us"]
 
 # Monitoring Configuration (auto-filled by setup.sh)
 enable_monitoring    = true
