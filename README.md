@@ -66,13 +66,40 @@ cd gcp-dr-cold-standby
 
 ```bash
 ./scripts/deploy.sh
-
-# Or manually:
-cd terraform
-terraform init
-terraform plan
-terraform apply
 ```
+
+**What deploy.sh does:**
+1. Enables required GCP APIs (Compute, DNS, Monitoring, etc.)
+2. Initializes Terraform
+3. Creates all infrastructure resources
+4. Waits for instances to be healthy
+5. Displays load balancer IP and endpoints
+
+**Or deploy manually:**
+
+```bash
+cd terraform
+
+# Initialize Terraform (downloads providers)
+terraform init
+
+# Preview changes
+terraform plan
+
+# Apply infrastructure
+terraform apply
+
+# Get outputs
+terraform output
+```
+
+**Resources created:**
+- VPC network with subnets in 2 regions
+- Managed Instance Groups (primary: 2 instances, standby: 0 instances)
+- Global HTTP(S) Load Balancer with health checks
+- Persistent Disk snapshot schedules
+- Heartbeat monitoring instance
+- Cloud Monitoring alerts and dashboard
 
 ### 3. Verify Deployment
 
@@ -107,18 +134,63 @@ cd ..
 
 ## DR Testing
 
+### Available Scripts
+
+| Script | Purpose | When to Use |
+|--------|---------|-------------|
+| `failover.sh` | Manual failover to standby | Real disaster or planned maintenance |
+| `failback.sh` | Manual return to primary | After disaster is resolved |
+| `test-failover.sh` | Automated DR drill | Regular DR testing/validation |
+
 ### Manual Failover
 
+Use these scripts for real disaster scenarios or planned maintenance:
+
 ```bash
+# Failover: Switch traffic from primary (us-central1) to standby (us-east1)
 ./scripts/failover.sh
+
+# Failback: Return traffic to primary after issue is resolved
 ./scripts/failback.sh
 ```
 
+**What failover.sh does:**
+1. Disables autoscalers for manual control
+2. Creates emergency snapshots of primary instances
+3. Scales down primary region to 0 instances
+4. Scales up standby region to 2 instances
+5. Switches load balancer to standby backend
+6. Verifies standby is serving traffic
+
+**What failback.sh does:**
+1. Disables autoscalers for manual control
+2. Scales up primary region to 2 instances
+3. Switches load balancer back to primary backend
+4. Scales down standby region to 0 instances
+5. Verifies primary is serving traffic
+
 ### Automated DR Test
 
+Use the automated test script for regular DR drills and validation:
+
 ```bash
+# Basic validation (doesn't change infrastructure)
+./scripts/test-failover.sh
+
+# Simulate actual failure (scales down primary, activates standby)
 ./scripts/test-failover.sh --simulate-failure
+
+# Full test with automatic failback
+./scripts/test-failover.sh --simulate-failure --full
+
+# Save test report to file
+./scripts/test-failover.sh --simulate-failure --full --report dr-test-report.txt
 ```
+
+**Options:**
+- `--simulate-failure`: Actually scales down primary and activates standby
+- `--full`: Runs complete DR drill including automatic failback
+- `--report FILE`: Saves detailed test report to specified file
 
 ### Verification Commands
 
