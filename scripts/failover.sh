@@ -166,16 +166,16 @@ log_success "Standby region scale-up initiated"
 
 # Step 4: Wait for standby instances to be healthy
 log_step "Step 4: Waiting for standby instances to become healthy..."
-MAX_WAIT=300
-WAIT_INTERVAL=10
+MAX_WAIT=600
+WAIT_INTERVAL=15
 ELAPSED=0
 
 while [ $ELAPSED -lt $MAX_WAIT ]; do
+    # Count instances with RUNNING status
     HEALTHY_COUNT=$(gcloud compute instance-groups managed list-instances "$STANDBY_MIG" \
         --region="$STANDBY_REGION" \
         --project="$PROJECT_ID" \
-        --filter="status=RUNNING" \
-        --format="value(instance)" 2>/dev/null | wc -l | tr -d ' ')
+        --format="table[no-heading](status)" 2>/dev/null | grep -c "RUNNING" || echo "0")
     
     if [ "$HEALTHY_COUNT" -ge "$STANDBY_SIZE" ]; then
         log_success "All $STANDBY_SIZE instances are running!"
@@ -189,11 +189,36 @@ done
 
 if [ $ELAPSED -ge $MAX_WAIT ]; then
     log_warning "Timeout waiting for all instances. Current: $HEALTHY_COUNT/$STANDBY_SIZE"
+    log_info "Checking final status..."
+    gcloud compute instance-groups managed list-instances "$STANDBY_MIG" \
+        --region="$STANDBY_REGION" \
+        --project="$PROJECT_ID"
 fi
 
-# Step 5: Verify load balancer health
-log_step "Step 5: Verifying load balancer health..."
-sleep 10  # Give LB time to detect healthy backends
+# Step 5: Switch URL map to standby backend
+log_step "Step 5: Switching load balancer to standby region..."
+
+# Get URL map and backend service names
+URL_MAP=$(gcloud compute url-maps list --project="$PROJECT_ID" --filter="name~dr-url-map" --format="value(name)" | head -1)
+STANDBY_BACKEND=$(gcloud compute backend-services list --global --project="$PROJECT_ID" --filter="name~standby" --format="value(name)" | head -1)
+
+if [ -n "$URL_MAP" ] && [ -n "$STANDBY_BACKEND" ]; then
+    log_info "  URL Map: $URL_MAP"
+    log_info "  Standby Backend: $STANDBY_BACKEND"
+    
+    gcloud compute url-maps set-default-service "$URL_MAP" \
+        --default-service="$STANDBY_BACKEND" \
+        --global \
+        --project="$PROJECT_ID" \
+        --quiet
+    log_success "Load balancer now pointing to standby region!"
+else
+    log_error "Could not find URL map or standby backend service"
+fi
+
+# Step 6: Verify load balancer health
+log_step "Step 6: Verifying load balancer health..."
+sleep 30  # Give LB time to detect healthy backends
 
 LB_TEST_RESULT=$(curl -s -o /dev/null -w "%{http_code}" "http://$LB_IP/health" 2>/dev/null || echo "000")
 if [ "$LB_TEST_RESULT" = "200" ]; then

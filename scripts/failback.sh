@@ -152,16 +152,16 @@ log_success "Primary region scale-up initiated"
 
 # Step 2: Wait for primary instances to be healthy
 log_step "Step 2: Waiting for primary instances to become healthy..."
-MAX_WAIT=300
-WAIT_INTERVAL=10
+MAX_WAIT=600
+WAIT_INTERVAL=15
 ELAPSED=0
 
 while [ $ELAPSED -lt $MAX_WAIT ]; do
+    # Count instances with RUNNING status
     HEALTHY_COUNT=$(gcloud compute instance-groups managed list-instances "$PRIMARY_MIG" \
         --region="$PRIMARY_REGION" \
         --project="$PROJECT_ID" \
-        --filter="status=RUNNING" \
-        --format="value(instance)" 2>/dev/null | wc -l | tr -d ' ')
+        --format="table[no-heading](status)" 2>/dev/null | grep -c "RUNNING" || echo "0")
     
     if [ "$HEALTHY_COUNT" -ge "$PRIMARY_SIZE" ]; then
         log_success "All $PRIMARY_SIZE instances are running!"
@@ -175,12 +175,37 @@ done
 
 if [ $ELAPSED -ge $MAX_WAIT ]; then
     log_error "Timeout waiting for primary instances!"
+    log_info "Checking final status..."
+    gcloud compute instance-groups managed list-instances "$PRIMARY_MIG" \
+        --region="$PRIMARY_REGION" \
+        --project="$PROJECT_ID"
     log_warning "Keeping standby region active for safety"
     exit 1
 fi
 
-# Step 3: Verify primary is serving traffic
-log_step "Step 3: Verifying primary region is healthy..."
+# Step 3: Switch URL map back to primary backend
+log_step "Step 3: Switching load balancer to primary region..."
+
+# Get URL map and backend service names
+URL_MAP=$(gcloud compute url-maps list --project="$PROJECT_ID" --filter="name~dr-url-map" --format="value(name)" | head -1)
+PRIMARY_BACKEND=$(gcloud compute backend-services list --global --project="$PROJECT_ID" --filter="name~primary" --format="value(name)" | head -1)
+
+if [ -n "$URL_MAP" ] && [ -n "$PRIMARY_BACKEND" ]; then
+    log_info "  URL Map: $URL_MAP"
+    log_info "  Primary Backend: $PRIMARY_BACKEND"
+    
+    gcloud compute url-maps set-default-service "$URL_MAP" \
+        --default-service="$PRIMARY_BACKEND" \
+        --global \
+        --project="$PROJECT_ID" \
+        --quiet
+    log_success "Load balancer now pointing to primary region!"
+else
+    log_error "Could not find URL map or primary backend service"
+fi
+
+# Step 4: Verify primary is serving traffic
+log_step "Step 4: Verifying primary region is healthy..."
 sleep 30  # Give LB time to detect healthy backends
 
 # Test the application
@@ -191,9 +216,9 @@ for i in {1..5}; do
     sleep 2
 done
 
-# Step 4: Scale down standby region
+# Step 5: Scale down standby region
 if [ "$GRADUAL" = true ]; then
-    log_step "Step 4 (Gradual): Scaling down standby region gradually..."
+    log_step "Step 5 (Gradual): Scaling down standby region gradually..."
     
     CURRENT_STANDBY=$(gcloud compute instance-groups managed list-instances "$STANDBY_MIG" \
         --region="$STANDBY_REGION" \
@@ -215,7 +240,7 @@ if [ "$GRADUAL" = true ]; then
     done
     log_success "Standby region fully scaled down"
 else
-    log_step "Step 4: Scaling down standby region..."
+    log_step "Step 5: Scaling down standby region..."
     gcloud compute instance-groups managed resize "$STANDBY_MIG" \
         --size=0 \
         --region="$STANDBY_REGION" \
@@ -224,8 +249,8 @@ else
     log_success "Standby region scaled to 0 instances"
 fi
 
-# Step 5: Final verification
-log_step "Step 5: Final verification..."
+# Step 6: Final verification
+log_step "Step 6: Final verification..."
 sleep 10
 
 LB_TEST_RESULT=$(curl -s -o /dev/null -w "%{http_code}" "http://$LB_IP/health" 2>/dev/null || echo "000")
