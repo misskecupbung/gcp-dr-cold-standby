@@ -120,10 +120,6 @@ else
         record_test "fail" "Primary region has no running instances"
     fi
 fi
-    record_test "pass" "Primary region has $PRIMARY_COUNT running instances"
-else
-    record_test "fail" "Primary region has no running instances"
-fi
 
 # Test 2: Verify load balancer is responding
 log_step "Test 2: Load balancer health check"
