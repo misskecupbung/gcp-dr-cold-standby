@@ -1,10 +1,9 @@
 # =============================================================================
-# Example Terraform Variables - Copy to terraform.tfvars and customize
+# Terraform Variables - Auto-configured by setup.sh
 # =============================================================================
 
-# Project Configuration (REQUIRED)
+# Project Configuration (auto-filled by setup.sh)
 project_id   = "your-gcp-project-id"
-project_name = "DR Cold Standby Lab"
 
 # Region Configuration
 primary_region  = "us-central1"
@@ -38,9 +37,10 @@ health_check_timeout  = 5
 healthy_threshold     = 2
 unhealthy_threshold   = 3
 
-# DNS Configuration
-dns_zone_name = "dr-lab-zone"
-domain_name   = "dr-lab.example.com."  # Must end with a dot
+# DNS Configuration (optional - set enable_dns = false to skip)
+enable_dns    = false
+dns_zone_name = "dr-zone"
+domain_name   = "dr.example.com."
 dns_ttl       = 300
 
 # Snapshot Configuration
@@ -48,15 +48,15 @@ snapshot_schedule_hours    = 1
 snapshot_retention_days    = 7
 snapshot_storage_locations = ["us"]
 
-# Monitoring Configuration
+# Monitoring Configuration (auto-filled by setup.sh)
 enable_monitoring    = true
 notification_email   = "your-email@example.com"
 uptime_check_period  = "60s"
 
-# Labels
+# Labels (auto-filled by setup.sh)
 environment = "lab"
 labels = {
   managed-by = "terraform"
-  purpose    = "dr-lab"
+  purpose    = "dr-cold-standby"
   owner      = "your-name"
 }

@@ -52,23 +52,17 @@ gcp-dr-cold-standby/
 
 ## Quick Start
 
-### 1. Clone and Configure
+### 1. Clone and Setup
 
 ```bash
 git clone https://github.com/misskecupbung/gcp-dr-cold-standby.git
 cd gcp-dr-cold-standby
 
-cp terraform/terraform.tfvars.example terraform/terraform.tfvars
-vim terraform/terraform.tfvars
-```
-
-### 2. Set Up Environment
-
-```bash
+# Run setup (auto-detects project, email, and configures terraform.tfvars)
 ./scripts/setup.sh
 ```
 
-### 3. Deploy Infrastructure
+### 2. Deploy Infrastructure
 
 ```bash
 ./scripts/deploy.sh
@@ -80,7 +74,7 @@ terraform plan
 terraform apply
 ```
 
-### 4. Verify Deployment
+### 3. Verify Deployment
 
 ```bash
 ./scripts/verify-deployment.sh
@@ -149,6 +143,36 @@ gcloud compute instances describe $(terraform output -raw heartbeat_instance_nam
 |--------|--------|
 | **RPO** (Recovery Point Objective) | ~1 hour (snapshot interval) |
 | **RTO** (Recovery Time Objective) | ~10-15 min (cold start) |
+
+## Optional: Enable DNS
+
+DNS is disabled by default. If you have a domain, you can enable it after deployment:
+
+```bash
+# 1. Edit terraform.tfvars
+vim terraform/terraform.tfvars
+```
+
+Update these values:
+```hcl
+enable_dns    = true
+dns_zone_name = "dr-zone"
+domain_name   = "dr.yourdomain.com."  # Must end with dot
+```
+
+```bash
+# 2. Apply changes
+cd terraform
+terraform apply
+
+# 3. Get the nameservers
+terraform output dns_name_servers
+
+# 4. Update your domain registrar with those nameservers
+
+# 5. Test after DNS propagation (5-60 min)
+curl http://dr.yourdomain.com/health
+```
 
 ## Additional Resources
 

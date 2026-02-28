@@ -100,15 +100,31 @@ if [ ! -f "$TFVARS_FILE" ]; then
     log_info "Creating terraform.tfvars from example..."
     cp "$PROJECT_ROOT/terraform/terraform.tfvars.example" "$TFVARS_FILE"
     
-    # Update project_id in tfvars
+    # Get default email from gcloud
+    DEFAULT_EMAIL=$(gcloud config get-value account 2>/dev/null)
+    
+    # Prompt for notification email
+    echo ""
+    read -p "Enter notification email [$DEFAULT_EMAIL]: " INPUT_EMAIL
+    USER_EMAIL=${INPUT_EMAIL:-$DEFAULT_EMAIL}
+    USER_NAME=$(echo "$USER_EMAIL" | cut -d'@' -f1)
+    
+    # Update values in tfvars
     if [[ "$OSTYPE" == "darwin"* ]]; then
         sed -i '' "s/your-gcp-project-id/$PROJECT_ID/" "$TFVARS_FILE"
+        sed -i '' "s/your-email@example.com/$USER_EMAIL/" "$TFVARS_FILE"
+        sed -i '' "s/your-name/$USER_NAME/" "$TFVARS_FILE"
     else
         sed -i "s/your-gcp-project-id/$PROJECT_ID/" "$TFVARS_FILE"
+        sed -i "s/your-email@example.com/$USER_EMAIL/" "$TFVARS_FILE"
+        sed -i "s/your-name/$USER_NAME/" "$TFVARS_FILE"
     fi
     
-    log_warning "Created terraform.tfvars - please review and update values"
-    log_warning "  File: $TFVARS_FILE"
+    echo ""
+    log_success "Created terraform.tfvars with values:"
+    log_info "  project_id: $PROJECT_ID"
+    log_info "  notification_email: $USER_EMAIL"
+    log_info "  owner: $USER_NAME"
 else
     log_info "terraform.tfvars already exists"
 fi
