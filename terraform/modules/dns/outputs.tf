@@ -2,27 +2,22 @@
 # DNS Module - Outputs
 # =============================================================================
 
-output "dns_zone_name" {
+output "zone_name" {
   description = "The name of the Cloud DNS managed zone"
-  value       = google_dns_managed_zone.main.name
+  value       = google_dns_managed_zone.primary.name
 }
 
-output "dns_name_servers" {
+output "name_servers" {
   description = "The list of name servers for the DNS zone"
-  value       = google_dns_managed_zone.main.name_servers
+  value       = google_dns_managed_zone.primary.name_servers
 }
 
-output "primary_record_name" {
-  description = "The DNS name of the primary region A record"
-  value       = google_dns_record_set.primary.name
+output "dns_name" {
+  description = "The DNS name of the zone"
+  value       = google_dns_managed_zone.primary.dns_name
 }
 
-output "standby_record_name" {
-  description = "The DNS name of the standby region A record"
-  value       = google_dns_record_set.standby.name
-}
-
-output "main_record_name" {
+output "app_record_name" {
   description = "The DNS name of the main application A record"
   value       = google_dns_record_set.app.name
 }

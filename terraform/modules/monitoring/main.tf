@@ -26,7 +26,7 @@ resource "google_monitoring_uptime_check_config" "lb_health" {
   period       = var.uptime_check_period
 
   http_check {
-    path         = var.health_check_path
+    path         = "/health"
     port         = "80"
     use_ssl      = false
     validate_ssl = false
@@ -40,7 +40,7 @@ resource "google_monitoring_uptime_check_config" "lb_health" {
     type = "uptime_url"
     labels = {
       project_id = var.project_id
-      host       = var.lb_ip_address
+      host       = regex("http://([^/]+)", var.lb_url)[0]
     }
   }
 

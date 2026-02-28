@@ -17,7 +17,10 @@ resource "google_dns_managed_zone" "primary" {
     state = "on"
   }
 
-  labels = var.labels
+  labels = {
+    environment = var.environment
+    managed-by  = "terraform"
+  }
 }
 
 # =============================================================================
@@ -26,7 +29,7 @@ resource "google_dns_managed_zone" "primary" {
 resource "google_dns_record_set" "app" {
   name         = var.domain_name
   type         = "A"
-  ttl          = var.dns_ttl
+  ttl          = 300
   managed_zone = google_dns_managed_zone.primary.name
   project      = var.project_id
 
@@ -39,26 +42,9 @@ resource "google_dns_record_set" "app" {
 resource "google_dns_record_set" "www" {
   name         = "www.${var.domain_name}"
   type         = "CNAME"
-  ttl          = var.dns_ttl
+  ttl          = 300
   managed_zone = google_dns_managed_zone.primary.name
   project      = var.project_id
 
   rrdatas = [var.domain_name]
-}
-
-# =============================================================================
-# TXT Record - SPF (optional, for email)
-# =============================================================================
-resource "google_dns_record_set" "spf" {
-  name         = var.domain_name
-  type         = "TXT"
-  ttl          = var.dns_ttl
-  managed_zone = google_dns_managed_zone.primary.name
-  project      = var.project_id
-
-  rrdatas = ["\"v=spf1 include:_spf.google.com ~all\""]
-}
-
-output "dns_name" {
-  value = google_dns_managed_zone.primary.dns_name
 }
