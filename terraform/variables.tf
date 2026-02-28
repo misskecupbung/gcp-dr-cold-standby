@@ -192,6 +192,12 @@ variable "dns_ttl" {
   default     = 300
 }
 
+variable "enable_dns" {
+  description = "Enable Cloud DNS (requires a registered domain)"
+  type        = bool
+  default     = false
+}
+
 # =============================================================================
 # Snapshot Configuration
 # =============================================================================
@@ -205,12 +211,6 @@ variable "snapshot_retention_days" {
   description = "Number of days to retain snapshots"
   type        = number
   default     = 7
-}
-
-variable "snapshot_storage_locations" {
-  description = "Regions where snapshots should be stored"
-  type        = list(string)
-  default     = ["us"]
 }
 
 # =============================================================================

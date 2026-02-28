@@ -60,13 +60,12 @@ module "networking" {
 module "snapshot" {
   source = "./modules/snapshot"
 
-  project_id                 = var.project_id
-  primary_region             = var.primary_region
-  standby_region             = var.standby_region
-  snapshot_schedule_hours    = var.snapshot_schedule_hours
-  snapshot_retention_days    = var.snapshot_retention_days
-  snapshot_storage_locations = var.snapshot_storage_locations
-  labels                     = local.labels
+  project_id              = var.project_id
+  environment             = var.environment
+  primary_region          = var.primary_region
+  standby_region          = var.standby_region
+  snapshot_schedule_hours = var.snapshot_schedule_hours
+  snapshot_retention_days = var.snapshot_retention_days
 
   depends_on = [google_project_service.required_apis]
 }
