@@ -349,23 +349,23 @@ Options to reduce RPO:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Service Account Permissions                   │
+│                    Service Account Permissions                  │
 ├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  Compute Service Account (dr-primary-sa / dr-standby-sa)         │
+│                                                                 │
+│  Compute Service Account (dr-primary-sa / dr-standby-sa)        │
 │  ├── roles/logging.logWriter                                    │
 │  ├── roles/monitoring.metricWriter                              │
 │  ├── roles/compute.instanceAdmin.v1                             │
 │  └── roles/storage.objectViewer                                 │
-│                                                                  │
-│  Heartbeat Service Account (dr-heartbeat-sa)                     │
+│                                                                 │
+│  Heartbeat Service Account (dr-heartbeat-sa)                    │
 │  ├── roles/compute.instanceAdmin.v1                             │
 │  ├── roles/compute.storageAdmin (for snapshots)                 │
 │  ├── roles/monitoring.metricWriter                              │
 │  ├── roles/logging.logWriter                                    │
 │  ├── roles/storage.objectAdmin                                  │
 │  └── roles/dns.admin                                            │
-│                                                                  │
+│                                                                 │
 └─────────────────────────────────────────────────────────────────┘
 ```
 

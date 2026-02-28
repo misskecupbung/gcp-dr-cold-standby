@@ -6,46 +6,7 @@ A production-ready hands-on lab demonstrating **Cold Standby Disaster Recovery**
 
 ## Architecture Overview
 
-```
-                              INTERNET USERS
-                                    |
-                                    v
-                    +-------------------------------+
-                    |  Global HTTP(S) Load Balancer |
-                    |      + Cloud DNS              |
-                    +---------------+---------------+
-                                    |
-              +---------------------+---------------------+
-              |                                           |
-              v                                           v
-+-----------------------------+         +-----------------------------+
-|  PRIMARY REGION             |         |  STANDBY REGION             |
-|  (us-central1) [ACTIVE]     |         |  (us-east1) [COLD]          |
-|                             |         |                             |
-|  +-----------------------+  |         |  +-----------------------+  |
-|  | Managed Instance Group|  |         |  | Managed Instance Group|  |
-|  | (2-5 VMs running)     |  |         |  | (0 VMs - scaled down) |  |
-|  +-----------+-----------+  |         |  +-----------------------+  |
-|              |              |         |                             |
-|  +-----------v-----------+  |         |  +-----------------------+  |
-|  |  Persistent Disk      |  |         |  |  Disk from Snapshot   |  |
-|  |  (Regional)           |--+-------->|  |  (On failover)        |  |
-|  +-----------------------+  | Snapshot|  +-----------------------+  |
-|                             |         |                             |
-|  +-----------------------+  |         |                             |
-|  | Heartbeat VM          |  |         |                             |
-|  | - Health monitoring   |  |         |                             |
-|  | - Snapshot scheduler  |  |         |                             |
-|  +-----------------------+  |         |                             |
-+-----------------------------+         +-----------------------------+
-              |
-              v
-    +-----------------------+
-    |  Cloud Monitoring     |
-    |  - Uptime checks      |
-    |  - Alerting policies  |
-    +-----------------------+
-```
+![image](img/gcp-dr-cold-standby_architecture.png)
 
 ## Prerequisites
 
@@ -127,17 +88,6 @@ terraform apply
 ./scripts/verify-deployment.sh
 curl http://$(terraform output -raw load_balancer_ip)/health
 ```
-
-## Lab Timeline (45 minutes)
-
-| Phase | Duration | Activities |
-|-------|----------|------------|
-| Setup | 5 min | Environment setup, API enablement |
-| Deploy Primary | 10 min | Deploy primary region infrastructure |
-| Deploy Standby | 10 min | Configure standby region (cold) |
-| Configure DR | 10 min | Set up snapshots, heartbeat, DNS |
-| Test Failover | 7 min | Execute and validate failover |
-| Cleanup | 3 min | Destroy resources |
 
 ## Key Components
 
