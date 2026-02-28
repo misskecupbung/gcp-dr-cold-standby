@@ -199,14 +199,18 @@ module "load_balancing" {
 # DNS Module
 # =============================================================================
 module "dns" {
+  count  = var.enable_dns ? 1 : 0
   source = "./modules/dns"
 
-  project_id       = var.project_id
-  dns_zone_name    = var.dns_zone_name
-  domain_name      = var.domain_name
-  dns_ttl          = var.dns_ttl
-  lb_ip_address    = module.load_balancing.lb_ip_address
-  labels           = local.labels
+  project_id             = var.project_id
+  environment            = var.environment
+  dns_zone_name          = var.dns_zone_name
+  domain_name            = var.domain_name
+  lb_ip_address          = module.load_balancing.lb_ip_address
+  primary_region         = var.primary_region
+  standby_region         = var.standby_region
+  primary_instance_group = module.compute_primary.mig_self_link
+  standby_instance_group = module.compute_standby.mig_self_link
 
   depends_on = [module.load_balancing]
 }
@@ -228,5 +232,5 @@ module "monitoring" {
   lb_url             = "http://${module.load_balancing.lb_ip_address}/health"
   uptime_check_period = var.uptime_check_period
 
-  depends_on = [module.load_balancing, module.dns]
+  depends_on = [module.load_balancing]
 }
