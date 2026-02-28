@@ -198,6 +198,15 @@ if [ "$SIMULATE_FAILURE" = true ]; then
     log_warning "Simulating primary region failure..."
     FAILOVER_START=$(date +%s)
     
+    # Disable autoscaling first (like failover.sh does)
+    log_info "Disabling autoscaling..."
+    gcloud compute instance-groups managed stop-autoscaling "$PRIMARY_MIG" \
+        --region="$PRIMARY_REGION" \
+        --project="$PROJECT_ID" 2>/dev/null || true
+    gcloud compute instance-groups managed stop-autoscaling "$STANDBY_MIG" \
+        --region="$STANDBY_REGION" \
+        --project="$PROJECT_ID" 2>/dev/null || true
+    
     # Scale down primary
     log_step "Scaling down primary region to simulate failure..."
     gcloud compute instance-groups managed resize "$PRIMARY_MIG" \
@@ -206,27 +215,38 @@ if [ "$SIMULATE_FAILURE" = true ]; then
         --project="$PROJECT_ID" \
         --quiet
     
-    log_info "Waiting 30 seconds for failure detection..."
-    sleep 30
+    log_info "Waiting for primary to scale down..."
+    # Wait for primary to actually stop (using isStable)
+    MAX_WAIT=180
+    ELAPSED=0
+    while [ $ELAPSED -lt $MAX_WAIT ]; do
+        IS_STABLE=$(gcloud compute instance-groups managed describe "$PRIMARY_MIG" \
+            --region="$PRIMARY_REGION" \
+            --project="$PROJECT_ID" \
+            --format="value(status.isStable)" 2>/dev/null || echo "False")
+        TARGET=$(gcloud compute instance-groups managed describe "$PRIMARY_MIG" \
+            --region="$PRIMARY_REGION" \
+            --project="$PROJECT_ID" \
+            --format="value(targetSize)" 2>/dev/null || echo "0")
+        
+        if [ "$IS_STABLE" = "True" ] && [ "$TARGET" = "0" ]; then
+            break
+        fi
+        sleep 10
+        ELAPSED=$((ELAPSED + 10))
+    done
     
     # Verify primary is down
     log_step "Test 6: Verify primary failure simulation"
-    PRIMARY_LIST=$(gcloud compute instance-groups managed list-instances "$PRIMARY_MIG" \
+    PRIMARY_TARGET=$(gcloud compute instance-groups managed describe "$PRIMARY_MIG" \
         --region="$PRIMARY_REGION" \
         --project="$PROJECT_ID" \
-        --format="value(instance)" 2>/dev/null || echo "")
-    if [ -z "$PRIMARY_LIST" ]; then
-        PRIMARY_COUNT=0
-    else
-        PRIMARY_COUNT=$(echo "$PRIMARY_LIST" | grep -c . 2>/dev/null || echo "0")
-    fi
-    PRIMARY_COUNT=$(echo "$PRIMARY_COUNT" | tr -d '\n' | tr -d ' ')
-    PRIMARY_COUNT=${PRIMARY_COUNT:-0}
+        --format="value(targetSize)" 2>/dev/null || echo "0")
     
-    if [ "$PRIMARY_COUNT" -eq 0 ]; then
+    if [ "$PRIMARY_TARGET" = "0" ]; then
         record_test "pass" "Primary region successfully stopped"
     else
-        record_test "fail" "Primary region still has $PRIMARY_COUNT instances"
+        record_test "fail" "Primary region still has $PRIMARY_TARGET instances"
     fi
     
     echo ""
@@ -243,25 +263,34 @@ if [ "$SIMULATE_FAILURE" = true ]; then
     
     log_info "Waiting for standby instances to start..."
     
-    # Wait for standby
+    # Wait for standby using isStable (like failover.sh)
     MAX_WAIT=300
     WAIT_INTERVAL=15
     ELAPSED=0
+    STANDBY_COUNT=0
     
     while [ $ELAPSED -lt $MAX_WAIT ]; do
-        STANDBY_LIST=$(gcloud compute instance-groups managed list-instances "$STANDBY_MIG" \
+        # Check if MIG is stable with target size
+        MIG_STATUS=$(gcloud compute instance-groups managed describe "$STANDBY_MIG" \
             --region="$STANDBY_REGION" \
             --project="$PROJECT_ID" \
-            --format="value(status)" 2>/dev/null || echo "")
-        STANDBY_COUNT=$(echo "$STANDBY_LIST" | grep -c "RUNNING" 2>/dev/null || echo "0")
-        STANDBY_COUNT=$(echo "$STANDBY_COUNT" | tr -d '\n' | tr -d ' ')
-        STANDBY_COUNT=${STANDBY_COUNT:-0}
+            --format="value(status.isStable,targetSize)" 2>/dev/null)
+        IS_STABLE=$(echo "$MIG_STATUS" | cut -f1)
+        TARGET_SIZE=$(echo "$MIG_STATUS" | cut -f2)
         
-        if [ "$STANDBY_COUNT" -ge 2 ]; then
+        if [ "$IS_STABLE" = "True" ] && [ "$TARGET_SIZE" = "2" ]; then
+            STANDBY_COUNT=2
             break
         fi
         
-        log_info "  $STANDBY_COUNT/2 instances running... (${ELAPSED}s)"
+        # Get current running count for display
+        CURRENT=$(gcloud compute instance-groups managed describe "$STANDBY_MIG" \
+            --region="$STANDBY_REGION" \
+            --project="$PROJECT_ID" \
+            --format="value(currentActions.none)" 2>/dev/null || echo "0")
+        CURRENT=${CURRENT:-0}
+        
+        log_info "  ${CURRENT}/2 instances running... (${ELAPSED}s)"
         sleep $WAIT_INTERVAL
         ELAPSED=$((ELAPSED + WAIT_INTERVAL))
     done
@@ -329,20 +358,29 @@ if [ "$SIMULATE_FAILURE" = true ]; then
         log_info "Waiting for primary instances..."
         
         ELAPSED=0
+        PRIMARY_COUNT=0
         while [ $ELAPSED -lt $MAX_WAIT ]; do
-            PRIMARY_LIST=$(gcloud compute instance-groups managed list-instances "$PRIMARY_MIG" \
+            # Check if MIG is stable with target size
+            MIG_STATUS=$(gcloud compute instance-groups managed describe "$PRIMARY_MIG" \
                 --region="$PRIMARY_REGION" \
                 --project="$PROJECT_ID" \
-                --format="value(status)" 2>/dev/null || echo "")
-            PRIMARY_COUNT=$(echo "$PRIMARY_LIST" | grep -c "RUNNING" 2>/dev/null || echo "0")
-            PRIMARY_COUNT=$(echo "$PRIMARY_COUNT" | tr -d '\n' | tr -d ' ')
-            PRIMARY_COUNT=${PRIMARY_COUNT:-0}
+                --format="value(status.isStable,targetSize)" 2>/dev/null)
+            IS_STABLE=$(echo "$MIG_STATUS" | cut -f1)
+            TARGET_SIZE=$(echo "$MIG_STATUS" | cut -f2)
             
-            if [ "$PRIMARY_COUNT" -ge 2 ]; then
+            if [ "$IS_STABLE" = "True" ] && [ "$TARGET_SIZE" = "2" ]; then
+                PRIMARY_COUNT=2
                 break
             fi
             
-            log_info "  $PRIMARY_COUNT/2 instances running... (${ELAPSED}s)"
+            # Get current running count for display
+            CURRENT=$(gcloud compute instance-groups managed describe "$PRIMARY_MIG" \
+                --region="$PRIMARY_REGION" \
+                --project="$PROJECT_ID" \
+                --format="value(currentActions.none)" 2>/dev/null || echo "0")
+            CURRENT=${CURRENT:-0}
+            
+            log_info "  ${CURRENT}/2 instances running... (${ELAPSED}s)"
             sleep $WAIT_INTERVAL
             ELAPSED=$((ELAPSED + WAIT_INTERVAL))
         done
