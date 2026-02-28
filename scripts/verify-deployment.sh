@@ -53,8 +53,9 @@ PRIMARY_INSTANCES=$(gcloud compute instance-groups managed list-instances "$PRIM
 
 if [ -n "$PRIMARY_INSTANCES" ]; then
     echo "$PRIMARY_INSTANCES"
-    PRIMARY_COUNT=$(echo "$PRIMARY_INSTANCES" | grep -c "RUNNING" || echo "0")
-    if [ "$PRIMARY_COUNT" -ge 1 ]; then
+    PRIMARY_COUNT=$(echo "$PRIMARY_INSTANCES" | grep -c "RUNNING" 2>/dev/null || true)
+    PRIMARY_COUNT=${PRIMARY_COUNT:-0}
+    if [ "$PRIMARY_COUNT" -ge 1 ] 2>/dev/null; then
         log_success "Primary MIG: $PRIMARY_COUNT instances running"
     else
         log_warning "Primary MIG: No running instances"
@@ -71,8 +72,9 @@ STANDBY_INSTANCES=$(gcloud compute instance-groups managed list-instances "$STAN
     --project="$PROJECT_ID" \
     --format="table(instance,status)" 2>/dev/null)
 
-STANDBY_COUNT=$(echo "$STANDBY_INSTANCES" | grep -c "RUNNING" 2>/dev/null || echo "0")
-if [ "$STANDBY_COUNT" -eq 0 ]; then
+STANDBY_COUNT=$(echo "$STANDBY_INSTANCES" | grep -c "RUNNING" 2>/dev/null || true)
+STANDBY_COUNT=${STANDBY_COUNT:-0}
+if [ "$STANDBY_COUNT" -eq 0 ] 2>/dev/null; then
     log_success "Standby MIG: Cold standby (0 instances) - as expected"
 else
     log_warning "Standby MIG: $STANDBY_COUNT instances (expected: 0 for cold standby)"

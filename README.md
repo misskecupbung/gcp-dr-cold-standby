@@ -77,8 +77,12 @@ terraform apply
 ### 3. Verify Deployment
 
 ```bash
-./scripts/verify-deployment.sh
+# From terraform directory, test the load balancer
 curl http://$(terraform output -raw load_balancer_ip)/health
+
+# Or go back to repo root and run verification script
+cd ..
+./scripts/verify-deployment.sh
 ```
 
 ## Key Components
