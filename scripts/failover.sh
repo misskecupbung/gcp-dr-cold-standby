@@ -95,6 +95,43 @@ echo ""
 log_info "Starting failover at $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 echo ""
 
+# Step 0: Disable autoscalers (required before manual resize)
+log_step "Step 0: Disabling autoscalers for manual control..."
+
+# Get autoscaler names
+PRIMARY_AUTOSCALER=$(gcloud compute region-autoscalers list \
+    --filter="target~$PRIMARY_MIG" \
+    --regions="$PRIMARY_REGION" \
+    --project="$PROJECT_ID" \
+    --format="value(name)" 2>/dev/null | head -1)
+
+STANDBY_AUTOSCALER=$(gcloud compute region-autoscalers list \
+    --filter="target~$STANDBY_MIG" \
+    --regions="$STANDBY_REGION" \
+    --project="$PROJECT_ID" \
+    --format="value(name)" 2>/dev/null | head -1)
+
+if [ -n "$PRIMARY_AUTOSCALER" ]; then
+    log_info "  Disabling primary autoscaler: $PRIMARY_AUTOSCALER"
+    gcloud compute region-autoscalers update "$PRIMARY_AUTOSCALER" \
+        --region="$PRIMARY_REGION" \
+        --project="$PROJECT_ID" \
+        --mode=off \
+        --quiet 2>/dev/null || log_warning "Could not disable primary autoscaler"
+fi
+
+if [ -n "$STANDBY_AUTOSCALER" ]; then
+    log_info "  Disabling standby autoscaler: $STANDBY_AUTOSCALER"
+    gcloud compute region-autoscalers update "$STANDBY_AUTOSCALER" \
+        --region="$STANDBY_REGION" \
+        --project="$PROJECT_ID" \
+        --mode=off \
+        --quiet 2>/dev/null || log_warning "Could not disable standby autoscaler"
+fi
+
+log_success "Autoscalers disabled"
+echo ""
+
 # Step 1: Create snapshot of primary disks (if possible)
 log_step "Step 1: Creating emergency snapshot of primary region..."
 PRIMARY_INSTANCES=$(gcloud compute instance-groups managed list-instances "$PRIMARY_MIG" \
