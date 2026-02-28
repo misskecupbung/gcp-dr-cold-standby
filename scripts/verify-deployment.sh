@@ -55,8 +55,7 @@ if [ "$PRIMARY_COUNT" -ge 1 ] 2>/dev/null; then
     log_success "Primary MIG: $PRIMARY_COUNT instances running"
     gcloud compute instance-groups managed list-instances "$PRIMARY_MIG" \
         --region="$PRIMARY_REGION" \
-        --project="$PROJECT_ID" \
-        --format="table[box](instance.scope(instances):label=INSTANCE,zone.scope(zones):label=ZONE,instanceStatus:label=STATUS)" 2>/dev/null
+        --project="$PROJECT_ID" 2>/dev/null
 else
     log_warning "Primary MIG: No running instances"
 fi
@@ -75,8 +74,7 @@ else
     log_warning "Standby MIG: $STANDBY_COUNT instances (expected: 0 for cold standby)"
     gcloud compute instance-groups managed list-instances "$STANDBY_MIG" \
         --region="$STANDBY_REGION" \
-        --project="$PROJECT_ID" \
-        --format="table[box](instance.scope(instances):label=INSTANCE,zone.scope(zones):label=ZONE,instanceStatus:label=STATUS)" 2>/dev/null
+        --project="$PROJECT_ID" 2>/dev/null
 fi
 echo ""
 
