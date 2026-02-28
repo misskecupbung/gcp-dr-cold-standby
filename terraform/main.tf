@@ -157,19 +157,20 @@ module "heartbeat" {
   source = "./modules/heartbeat"
 
   project_id            = var.project_id
-  region                = var.primary_region
-  zone                  = var.primary_zone
-  network_id            = module.networking.network_id
-  subnet_id             = module.networking.primary_subnet_id
-  machine_type          = var.machine_type_heartbeat
-  primary_mig_name      = module.compute_primary.mig_name
-  standby_mig_name      = module.compute_standby.mig_name
+  environment           = var.environment
+  primary_region        = var.primary_region
   standby_region        = var.standby_region
-  snapshot_policy_id    = module.snapshot.snapshot_policy_id
-  labels                = local.labels
-  name_suffix           = random_id.suffix.hex
+  network               = module.networking.network_self_link
+  primary_subnet        = module.networking.primary_subnet_self_link
+  standby_subnet        = module.networking.standby_subnet_self_link
+  machine_type          = var.machine_type_heartbeat
+  lb_ip_address         = module.load_balancing.lb_ip_address
+  primary_mig_self_link = module.compute_primary.mig_self_link
+  standby_mig_self_link = module.compute_standby.mig_self_link
+  service_account_email = module.compute_primary.service_account_email
+  notification_email    = var.notification_email
 
-  depends_on = [module.compute_primary, module.compute_standby]
+  depends_on = [module.compute_primary, module.compute_standby, module.load_balancing]
 }
 
 # =============================================================================

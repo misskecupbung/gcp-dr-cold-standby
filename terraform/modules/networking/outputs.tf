@@ -27,6 +27,11 @@ output "primary_subnet_name" {
   value       = google_compute_subnetwork.primary.name
 }
 
+output "primary_subnet_self_link" {
+  description = "The self link of the primary region subnet"
+  value       = google_compute_subnetwork.primary.self_link
+}
+
 output "standby_subnet_id" {
   description = "The ID of the standby region subnet"
   value       = google_compute_subnetwork.standby.id
@@ -35,4 +40,9 @@ output "standby_subnet_id" {
 output "standby_subnet_name" {
   description = "The name of the standby region subnet"
   value       = google_compute_subnetwork.standby.name
+}
+
+output "standby_subnet_self_link" {
+  description = "The self link of the standby region subnet"
+  value       = google_compute_subnetwork.standby.self_link
 }
