@@ -279,17 +279,27 @@ if [ "$SIMULATE_FAILURE" = true ]; then
         TARGET_SIZE=$(echo "$MIG_STATUS" | cut -f2)
         
         # Get current running count by listing instances
-        CURRENT=$(gcloud compute instance-groups managed list-instances "$STANDBY_MIG" \
+        RUNNING_LIST=$(gcloud compute instance-groups managed list-instances "$STANDBY_MIG" \
             --region="$STANDBY_REGION" \
             --project="$PROJECT_ID" \
-            --format="value(status)" 2>/dev/null | grep -c "RUNNING" || echo "0")
+            --format="value(status)" 2>/dev/null || echo "")
+        if [ -z "$RUNNING_LIST" ]; then
+            CURRENT=0
+        else
+            CURRENT=$(echo "$RUNNING_LIST" | grep -c "RUNNING" 2>/dev/null || echo "0")
+        fi
+        # Ensure CURRENT is a valid integer
+        CURRENT=$(echo "$CURRENT" | tr -d '\n' | tr -d ' ' | head -c 10)
         CURRENT=${CURRENT:-0}
+        if ! [[ "$CURRENT" =~ ^[0-9]+$ ]]; then
+            CURRENT=0
+        fi
         
         # Exit if stable OR if we have 2 RUNNING instances (don't wait for auto-healing)
         if [ "$IS_STABLE" = "True" ] && [ "$TARGET_SIZE" = "2" ]; then
             STANDBY_COUNT=2
             break
-        elif [ "$CURRENT" -ge 2 ]; then
+        elif [ "$CURRENT" -ge 2 ] 2>/dev/null; then
             STANDBY_COUNT=$CURRENT
             break
         fi
@@ -390,18 +400,28 @@ if [ "$SIMULATE_FAILURE" = true ]; then
             TARGET_SIZE=$(echo "$MIG_STATUS" | cut -f2)
             
             # Get current running count by listing instances
-            CURRENT=$(gcloud compute instance-groups managed list-instances "$PRIMARY_MIG" \
+            RUNNING_LIST=$(gcloud compute instance-groups managed list-instances "$PRIMARY_MIG" \
                 --region="$PRIMARY_REGION" \
                 --project="$PROJECT_ID" \
-                --format="value(status)" 2>/dev/null | grep -c "RUNNING" || echo "0")
+                --format="value(status)" 2>/dev/null || echo "")
+            if [ -z "$RUNNING_LIST" ]; then
+                CURRENT=0
+            else
+                CURRENT=$(echo "$RUNNING_LIST" | grep -c "RUNNING" 2>/dev/null || echo "0")
+            fi
+            # Ensure CURRENT is a valid integer
+            CURRENT=$(echo "$CURRENT" | tr -d '\n' | tr -d ' ' | head -c 10)
             CURRENT=${CURRENT:-0}
+            if ! [[ "$CURRENT" =~ ^[0-9]+$ ]]; then
+                CURRENT=0
+            fi
             
             # Exit if stable OR if we have 2 RUNNING instances (don't wait for auto-healing)
             if [ "$IS_STABLE" = "True" ] && [ "$TARGET_SIZE" = "2" ]; then
                 PRIMARY_COUNT=2
                 log_success "Primary instances are ready (stable)!"
                 break
-            elif [ "$CURRENT" -ge 2 ]; then
+            elif [ "$CURRENT" -ge 2 ] 2>/dev/null; then
                 PRIMARY_COUNT=$CURRENT
                 log_success "Primary instances are running ($CURRENT instances)!"
                 break
