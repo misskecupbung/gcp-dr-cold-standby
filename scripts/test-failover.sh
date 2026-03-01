@@ -282,7 +282,7 @@ if [ "$SIMULATE_FAILURE" = true ]; then
         RUNNING_LIST=$(gcloud compute instance-groups managed list-instances "$STANDBY_MIG" \
             --region="$STANDBY_REGION" \
             --project="$PROJECT_ID" \
-            --format="value(status)" 2>/dev/null || echo "")
+            --format="value(instanceStatus)" 2>/dev/null || echo "")
         if [ -z "$RUNNING_LIST" ]; then
             CURRENT=0
         else
@@ -399,11 +399,13 @@ if [ "$SIMULATE_FAILURE" = true ]; then
             IS_STABLE=$(echo "$MIG_STATUS" | cut -f1)
             TARGET_SIZE=$(echo "$MIG_STATUS" | cut -f2)
             
-            # Get current running count by listing instances
+            # Get instance statuses
             RUNNING_LIST=$(gcloud compute instance-groups managed list-instances "$PRIMARY_MIG" \
                 --region="$PRIMARY_REGION" \
                 --project="$PROJECT_ID" \
-                --format="value(status)" 2>/dev/null || echo "")
+                --format="value(instanceStatus)" 2>/dev/null || echo "")
+            
+            # Count RUNNING instances
             if [ -z "$RUNNING_LIST" ]; then
                 CURRENT=0
             else
