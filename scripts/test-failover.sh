@@ -306,6 +306,19 @@ if [ "$SIMULATE_FAILURE" = true ]; then
         record_test "fail" "Standby region only has $STANDBY_COUNT instances"
     fi
     
+    # Switch URL map to standby backend (like failover.sh)
+    log_info "Switching load balancer to standby region..."
+    URL_MAP=$(gcloud compute url-maps list --project="$PROJECT_ID" --filter="name~dr-url-map" --format="value(name)" | head -1)
+    
+    if [ -n "$URL_MAP" ]; then
+        TEMP_FILE="/tmp/url-map-test-failover-$$.yaml"
+        gcloud compute url-maps export "$URL_MAP" --global --project="$PROJECT_ID" --destination="$TEMP_FILE" 2>/dev/null
+        sed -i 's/dr-backend-primary/dr-backend-standby/g' "$TEMP_FILE"
+        gcloud compute url-maps import "$URL_MAP" --global --project="$PROJECT_ID" --source="$TEMP_FILE" --quiet 2>/dev/null
+        rm -f "$TEMP_FILE"
+        log_success "Load balancer switched to standby"
+    fi
+    
     # Test 8: Verify RTO
     log_step "Test 8: RTO validation (target: 900s)"
     if [ "$RTO_ACTUAL" -le 900 ]; then
@@ -391,6 +404,19 @@ if [ "$SIMULATE_FAILURE" = true ]; then
             --region="$STANDBY_REGION" \
             --project="$PROJECT_ID" \
             --quiet
+        
+        # Switch URL map back to primary backend
+        log_info "Switching load balancer back to primary region..."
+        URL_MAP=$(gcloud compute url-maps list --project="$PROJECT_ID" --filter="name~dr-url-map" --format="value(name)" | head -1)
+        
+        if [ -n "$URL_MAP" ]; then
+            TEMP_FILE="/tmp/url-map-test-failback-$$.yaml"
+            gcloud compute url-maps export "$URL_MAP" --global --project="$PROJECT_ID" --destination="$TEMP_FILE" 2>/dev/null
+            sed -i 's/dr-backend-standby/dr-backend-primary/g' "$TEMP_FILE"
+            gcloud compute url-maps import "$URL_MAP" --global --project="$PROJECT_ID" --source="$TEMP_FILE" --quiet 2>/dev/null
+            rm -f "$TEMP_FILE"
+            log_success "Load balancer switched back to primary"
+        fi
         
         FAILBACK_END=$(date +%s)
         FAILBACK_DURATION=$((FAILBACK_END - FAILBACK_START))
