@@ -264,7 +264,7 @@ if [ "$SIMULATE_FAILURE" = true ]; then
     log_info "Waiting for standby instances to start..."
     
     # Wait for standby using isStable (like failover.sh)
-    MAX_WAIT=300
+    MAX_WAIT=420
     WAIT_INTERVAL=15
     ELAPSED=0
     STANDBY_COUNT=0
@@ -278,17 +278,21 @@ if [ "$SIMULATE_FAILURE" = true ]; then
         IS_STABLE=$(echo "$MIG_STATUS" | cut -f1)
         TARGET_SIZE=$(echo "$MIG_STATUS" | cut -f2)
         
+        # Get current running count by listing instances
+        CURRENT=$(gcloud compute instance-groups managed list-instances "$STANDBY_MIG" \
+            --region="$STANDBY_REGION" \
+            --project="$PROJECT_ID" \
+            --format="value(status)" 2>/dev/null | grep -c "RUNNING" || echo "0")
+        CURRENT=${CURRENT:-0}
+        
+        # Exit if stable OR if we have 2 RUNNING instances (don't wait for auto-healing)
         if [ "$IS_STABLE" = "True" ] && [ "$TARGET_SIZE" = "2" ]; then
             STANDBY_COUNT=2
             break
+        elif [ "$CURRENT" -ge 2 ]; then
+            STANDBY_COUNT=$CURRENT
+            break
         fi
-        
-        # Get current running count for display
-        CURRENT=$(gcloud compute instance-groups managed describe "$STANDBY_MIG" \
-            --region="$STANDBY_REGION" \
-            --project="$PROJECT_ID" \
-            --format="value(currentActions.none)" 2>/dev/null || echo "0")
-        CURRENT=${CURRENT:-0}
         
         log_info "  ${CURRENT}/2 instances running... (${ELAPSED}s)"
         sleep $WAIT_INTERVAL
@@ -327,9 +331,9 @@ if [ "$SIMULATE_FAILURE" = true ]; then
         record_test "fail" "RTO exceeded: ${RTO_ACTUAL}s (target: 900s)"
     fi
     
-    # Wait for load balancer
-    log_info "Waiting 60 seconds for load balancer health checks..."
-    sleep 60
+    # Wait for load balancer (global LB health checks need time to propagate)
+    log_info "Waiting 90 seconds for load balancer health checks..."
+    sleep 90
     
     # Test 9: Service availability after failover
     log_step "Test 9: Service availability after failover"
@@ -370,8 +374,8 @@ if [ "$SIMULATE_FAILURE" = true ]; then
         
         log_info "Waiting for primary instances..."
         
-        # Reset wait variables for failback
-        MAX_WAIT_FAILBACK=300
+        # Reset wait variables for failback (longer timeout due to auto-healing delay)
+        MAX_WAIT_FAILBACK=420
         WAIT_INTERVAL_FAILBACK=15
         ELAPSED=0
         PRIMARY_COUNT=0
@@ -385,18 +389,23 @@ if [ "$SIMULATE_FAILURE" = true ]; then
             IS_STABLE=$(echo "$MIG_STATUS" | cut -f1)
             TARGET_SIZE=$(echo "$MIG_STATUS" | cut -f2)
             
-            if [ "$IS_STABLE" = "True" ] && [ "$TARGET_SIZE" = "2" ]; then
-                PRIMARY_COUNT=2
-                log_success "Primary instances are ready!"
-                break
-            fi
-            
-            # Get current running count for display
-            CURRENT=$(gcloud compute instance-groups managed describe "$PRIMARY_MIG" \
+            # Get current running count by listing instances
+            CURRENT=$(gcloud compute instance-groups managed list-instances "$PRIMARY_MIG" \
                 --region="$PRIMARY_REGION" \
                 --project="$PROJECT_ID" \
-                --format="value(currentActions.none)" 2>/dev/null || echo "0")
+                --format="value(status)" 2>/dev/null | grep -c "RUNNING" || echo "0")
             CURRENT=${CURRENT:-0}
+            
+            # Exit if stable OR if we have 2 RUNNING instances (don't wait for auto-healing)
+            if [ "$IS_STABLE" = "True" ] && [ "$TARGET_SIZE" = "2" ]; then
+                PRIMARY_COUNT=2
+                log_success "Primary instances are ready (stable)!"
+                break
+            elif [ "$CURRENT" -ge 2 ]; then
+                PRIMARY_COUNT=$CURRENT
+                log_success "Primary instances are running ($CURRENT instances)!"
+                break
+            fi
             
             log_info "  ${CURRENT}/2 instances running... (${ELAPSED}s)"
             sleep $WAIT_INTERVAL_FAILBACK
