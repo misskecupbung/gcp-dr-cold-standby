@@ -370,9 +370,13 @@ if [ "$SIMULATE_FAILURE" = true ]; then
         
         log_info "Waiting for primary instances..."
         
+        # Reset wait variables for failback
+        MAX_WAIT_FAILBACK=300
+        WAIT_INTERVAL_FAILBACK=15
         ELAPSED=0
         PRIMARY_COUNT=0
-        while [ $ELAPSED -lt $MAX_WAIT ]; do
+        
+        while [ $ELAPSED -lt $MAX_WAIT_FAILBACK ]; do
             # Check if MIG is stable with target size
             MIG_STATUS=$(gcloud compute instance-groups managed describe "$PRIMARY_MIG" \
                 --region="$PRIMARY_REGION" \
@@ -383,6 +387,7 @@ if [ "$SIMULATE_FAILURE" = true ]; then
             
             if [ "$IS_STABLE" = "True" ] && [ "$TARGET_SIZE" = "2" ]; then
                 PRIMARY_COUNT=2
+                log_success "Primary instances are ready!"
                 break
             fi
             
@@ -394,18 +399,11 @@ if [ "$SIMULATE_FAILURE" = true ]; then
             CURRENT=${CURRENT:-0}
             
             log_info "  ${CURRENT}/2 instances running... (${ELAPSED}s)"
-            sleep $WAIT_INTERVAL
-            ELAPSED=$((ELAPSED + WAIT_INTERVAL))
+            sleep $WAIT_INTERVAL_FAILBACK
+            ELAPSED=$((ELAPSED + WAIT_INTERVAL_FAILBACK))
         done
         
-        # Scale down standby
-        gcloud compute instance-groups managed resize "$STANDBY_MIG" \
-            --size=0 \
-            --region="$STANDBY_REGION" \
-            --project="$PROJECT_ID" \
-            --quiet
-        
-        # Switch URL map back to primary backend
+        # Switch URL map back to primary backend FIRST (before scaling down standby)
         log_info "Switching load balancer back to primary region..."
         URL_MAP=$(gcloud compute url-maps list --project="$PROJECT_ID" --filter="name~dr-url-map" --format="value(name)" | head -1)
         
@@ -417,6 +415,14 @@ if [ "$SIMULATE_FAILURE" = true ]; then
             rm -f "$TEMP_FILE"
             log_success "Load balancer switched back to primary"
         fi
+        
+        # Now scale down standby (after LB is pointing to primary)
+        log_info "Scaling down standby region..."
+        gcloud compute instance-groups managed resize "$STANDBY_MIG" \
+            --size=0 \
+            --region="$STANDBY_REGION" \
+            --project="$PROJECT_ID" \
+            --quiet
         
         FAILBACK_END=$(date +%s)
         FAILBACK_DURATION=$((FAILBACK_END - FAILBACK_START))
