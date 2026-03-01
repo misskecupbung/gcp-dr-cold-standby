@@ -278,28 +278,33 @@ if [ "$SIMULATE_FAILURE" = true ]; then
         IS_STABLE=$(echo "$MIG_STATUS" | cut -f1)
         TARGET_SIZE=$(echo "$MIG_STATUS" | cut -f2)
         
-        # Get current running count by listing instances
-        RUNNING_LIST=$(gcloud compute instance-groups managed list-instances "$STANDBY_MIG" \
+        # Get instance count - use 'status' field which appears earlier than instanceStatus
+        # status can be: RUNNING, STAGING, STOPPING, etc.
+        INSTANCE_LIST=$(gcloud compute instance-groups managed list-instances "$STANDBY_MIG" \
             --region="$STANDBY_REGION" \
             --project="$PROJECT_ID" \
-            --format="value(instanceStatus)" 2>/dev/null || echo "")
-        if [ -z "$RUNNING_LIST" ]; then
+            --format="value(instance,status)" 2>/dev/null || echo "")
+        
+        # Count total instances that exist (any status)
+        if [ -z "$INSTANCE_LIST" ]; then
             CURRENT=0
         else
-            CURRENT=$(echo "$RUNNING_LIST" | grep -c "RUNNING" 2>/dev/null || echo "0")
-        fi
-        # Ensure CURRENT is a valid integer
-        CURRENT=$(echo "$CURRENT" | tr -d '\n' | tr -d ' ' | head -c 10)
-        CURRENT=${CURRENT:-0}
-        if ! [[ "$CURRENT" =~ ^[0-9]+$ ]]; then
-            CURRENT=0
+            # Count instances that are RUNNING
+            RUNNING_COUNT=$(echo "$INSTANCE_LIST" | grep -c "RUNNING" 2>/dev/null || echo "0")
+            RUNNING_COUNT=$(echo "$RUNNING_COUNT" | tr -d '\n' | tr -d ' ')
+            RUNNING_COUNT=${RUNNING_COUNT:-0}
+            if [[ "$RUNNING_COUNT" =~ ^[0-9]+$ ]]; then
+                CURRENT=$RUNNING_COUNT
+            else
+                CURRENT=0
+            fi
         fi
         
         # Exit if stable OR if we have 2 RUNNING instances (don't wait for auto-healing)
         if [ "$IS_STABLE" = "True" ] && [ "$TARGET_SIZE" = "2" ]; then
             STANDBY_COUNT=2
             break
-        elif [ "$CURRENT" -ge 2 ] 2>/dev/null; then
+        elif [[ "$CURRENT" =~ ^[0-9]+$ ]] && [ "$CURRENT" -ge 2 ]; then
             STANDBY_COUNT=$CURRENT
             break
         fi
@@ -342,8 +347,9 @@ if [ "$SIMULATE_FAILURE" = true ]; then
     fi
     
     # Wait for load balancer (global LB health checks need time to propagate)
-    log_info "Waiting 90 seconds for load balancer health checks..."
-    sleep 90
+    # Need at least 2 minutes for health checks + propagation
+    log_info "Waiting 120 seconds for load balancer health checks..."
+    sleep 120
     
     # Test 9: Service availability after failover
     log_step "Test 9: Service availability after failover"
@@ -399,23 +405,24 @@ if [ "$SIMULATE_FAILURE" = true ]; then
             IS_STABLE=$(echo "$MIG_STATUS" | cut -f1)
             TARGET_SIZE=$(echo "$MIG_STATUS" | cut -f2)
             
-            # Get instance statuses
-            RUNNING_LIST=$(gcloud compute instance-groups managed list-instances "$PRIMARY_MIG" \
+            # Get instance count - use 'status' field which appears earlier than instanceStatus
+            INSTANCE_LIST=$(gcloud compute instance-groups managed list-instances "$PRIMARY_MIG" \
                 --region="$PRIMARY_REGION" \
                 --project="$PROJECT_ID" \
-                --format="value(instanceStatus)" 2>/dev/null || echo "")
+                --format="value(instance,status)" 2>/dev/null || echo "")
             
             # Count RUNNING instances
-            if [ -z "$RUNNING_LIST" ]; then
+            if [ -z "$INSTANCE_LIST" ]; then
                 CURRENT=0
             else
-                CURRENT=$(echo "$RUNNING_LIST" | grep -c "RUNNING" 2>/dev/null || echo "0")
-            fi
-            # Ensure CURRENT is a valid integer
-            CURRENT=$(echo "$CURRENT" | tr -d '\n' | tr -d ' ' | head -c 10)
-            CURRENT=${CURRENT:-0}
-            if ! [[ "$CURRENT" =~ ^[0-9]+$ ]]; then
-                CURRENT=0
+                RUNNING_COUNT=$(echo "$INSTANCE_LIST" | grep -c "RUNNING" 2>/dev/null || echo "0")
+                RUNNING_COUNT=$(echo "$RUNNING_COUNT" | tr -d '\n' | tr -d ' ')
+                RUNNING_COUNT=${RUNNING_COUNT:-0}
+                if [[ "$RUNNING_COUNT" =~ ^[0-9]+$ ]]; then
+                    CURRENT=$RUNNING_COUNT
+                else
+                    CURRENT=0
+                fi
             fi
             
             # Exit if stable OR if we have 2 RUNNING instances (don't wait for auto-healing)
@@ -423,7 +430,7 @@ if [ "$SIMULATE_FAILURE" = true ]; then
                 PRIMARY_COUNT=2
                 log_success "Primary instances are ready (stable)!"
                 break
-            elif [ "$CURRENT" -ge 2 ] 2>/dev/null; then
+            elif [[ "$CURRENT" =~ ^[0-9]+$ ]] && [ "$CURRENT" -ge 2 ]; then
                 PRIMARY_COUNT=$CURRENT
                 log_success "Primary instances are running ($CURRENT instances)!"
                 break
@@ -466,7 +473,9 @@ if [ "$SIMULATE_FAILURE" = true ]; then
             record_test "fail" "Failback incomplete - only $PRIMARY_COUNT instances"
         fi
         
-        sleep 60  # Wait for LB
+        # Wait for LB health checks to propagate (global LB needs time)
+        log_info "Waiting 90 seconds for LB health checks..."
+        sleep 90
         
         # Test 12: Post-failback service availability
         log_step "Test 12: Post-failback service availability"
