@@ -1,13 +1,11 @@
 #!/bin/bash
-# =============================================================================
-# Test Failover Script - Automated DR Testing
-# =============================================================================
+# Test failover - automated DR testing
+
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -23,7 +21,6 @@ log_error() { echo -e "${RED}[FAIL]${NC} $1"; }
 log_step() { echo -e "${CYAN}[TEST]${NC} $1"; }
 log_header() { echo -e "${MAGENTA}============================================================${NC}"; echo -e "${MAGENTA}   $1${NC}"; echo -e "${MAGENTA}============================================================${NC}"; }
 
-# Test results tracking
 TESTS_PASSED=0
 TESTS_FAILED=0
 TESTS_TOTAL=0
@@ -39,12 +36,10 @@ record_test() {
     fi
 }
 
-# Banner
 clear
-log_header "GCP DR Cold Standby Lab - DR TEST"
+log_header "DR Cold Standby Lab - DR TEST"
 echo ""
 
-# Parse arguments
 SIMULATE_FAILURE=false
 FULL_TEST=false
 REPORT_FILE=""
@@ -80,7 +75,6 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Get configuration
 cd "$PROJECT_ROOT/terraform"
 
 log_info "Loading configuration..."
@@ -102,11 +96,9 @@ echo ""
 # Test 1: Verify primary region is running
 log_step "Test 1: Primary region health check"
 
-# Check if PRIMARY_MIG is set
 if [ -z "$PRIMARY_MIG" ]; then
     record_test "fail" "Could not get PRIMARY_MIG from terraform output"
 else
-    # Use MIG describe to get current size
     MIG_INFO=$(gcloud compute instance-groups managed describe "$PRIMARY_MIG" \
         --region="$PRIMARY_REGION" \
         --project="$PROJECT_ID" \
@@ -165,7 +157,6 @@ fi
 # Test 5: Verify snapshot policy exists
 log_step "Test 5: Snapshot policy validation"
 
-# Check for snapshot schedule policy (more reliable than counting snapshots)
 POLICY_COUNT=$(gcloud compute resource-policies list \
     --project="$PROJECT_ID" \
     --filter="name~dr" \
@@ -175,7 +166,6 @@ POLICY_COUNT=${POLICY_COUNT:-0}
 if [ "$POLICY_COUNT" -ge 1 ]; then
     record_test "pass" "Found $POLICY_COUNT snapshot policy configured"
 else
-    # Check for any snapshots as fallback
     SNAPSHOT_COUNT=$(gcloud compute snapshots list \
         --project="$PROJECT_ID" \
         --format="value(name)" 2>/dev/null | wc -l | tr -d ' ')
@@ -198,7 +188,6 @@ if [ "$SIMULATE_FAILURE" = true ]; then
     log_warning "Simulating primary region failure..."
     FAILOVER_START=$(date +%s)
     
-    # Disable autoscaling first (like failover.sh does)
     log_info "Disabling autoscaling..."
     gcloud compute instance-groups managed stop-autoscaling "$PRIMARY_MIG" \
         --region="$PRIMARY_REGION" \
@@ -207,8 +196,7 @@ if [ "$SIMULATE_FAILURE" = true ]; then
         --region="$STANDBY_REGION" \
         --project="$PROJECT_ID" 2>/dev/null || true
     
-    # Scale down primary
-    log_step "Scaling down primary region to simulate failure..."
+    log_step "Scaling down primary to simulate failure..."
     gcloud compute instance-groups managed resize "$PRIMARY_MIG" \
         --size=0 \
         --region="$PRIMARY_REGION" \
@@ -216,7 +204,6 @@ if [ "$SIMULATE_FAILURE" = true ]; then
         --quiet
     
     log_info "Waiting for primary to scale down..."
-    # Wait for primary to actually stop (using isStable)
     MAX_WAIT=180
     ELAPSED=0
     while [ $ELAPSED -lt $MAX_WAIT ]; do
@@ -236,7 +223,6 @@ if [ "$SIMULATE_FAILURE" = true ]; then
         ELAPSED=$((ELAPSED + 10))
     done
     
-    # Verify primary is down
     log_step "Test 6: Verify primary failure simulation"
     PRIMARY_TARGET=$(gcloud compute instance-groups managed describe "$PRIMARY_MIG" \
         --region="$PRIMARY_REGION" \
@@ -253,7 +239,6 @@ if [ "$SIMULATE_FAILURE" = true ]; then
     log_header "Phase 3: Failover Execution"
     echo ""
     
-    # Scale up standby
     log_step "Activating standby region..."
     gcloud compute instance-groups managed resize "$STANDBY_MIG" \
         --size=2 \
@@ -263,14 +248,12 @@ if [ "$SIMULATE_FAILURE" = true ]; then
     
     log_info "Waiting for standby instances to start..."
     
-    # Wait for standby using isStable (like failover.sh)
     MAX_WAIT=420
     WAIT_INTERVAL=15
     ELAPSED=0
     STANDBY_COUNT=0
     
     while [ $ELAPSED -lt $MAX_WAIT ]; do
-        # Check if MIG is stable with target size
         MIG_STATUS=$(gcloud compute instance-groups managed describe "$STANDBY_MIG" \
             --region="$STANDBY_REGION" \
             --project="$PROJECT_ID" \
@@ -278,18 +261,14 @@ if [ "$SIMULATE_FAILURE" = true ]; then
         IS_STABLE=$(echo "$MIG_STATUS" | cut -f1)
         TARGET_SIZE=$(echo "$MIG_STATUS" | cut -f2)
         
-        # Get instance count - use 'status' field which appears earlier than instanceStatus
-        # status can be: RUNNING, STAGING, STOPPING, etc.
         INSTANCE_LIST=$(gcloud compute instance-groups managed list-instances "$STANDBY_MIG" \
             --region="$STANDBY_REGION" \
             --project="$PROJECT_ID" \
             --format="value(instance,status)" 2>/dev/null || echo "")
         
-        # Count total instances that exist (any status)
         if [ -z "$INSTANCE_LIST" ]; then
             CURRENT=0
         else
-            # Count instances that are RUNNING
             RUNNING_COUNT=$(echo "$INSTANCE_LIST" | grep -c "RUNNING" 2>/dev/null || echo "0")
             RUNNING_COUNT=$(echo "$RUNNING_COUNT" | tr -d '\n' | tr -d ' ')
             RUNNING_COUNT=${RUNNING_COUNT:-0}
@@ -300,7 +279,6 @@ if [ "$SIMULATE_FAILURE" = true ]; then
             fi
         fi
         
-        # Exit if stable OR if we have 2 RUNNING instances (don't wait for auto-healing)
         if [ "$IS_STABLE" = "True" ] && [ "$TARGET_SIZE" = "2" ]; then
             STANDBY_COUNT=2
             break
@@ -325,7 +303,6 @@ if [ "$SIMULATE_FAILURE" = true ]; then
         record_test "fail" "Standby region only has $STANDBY_COUNT instances"
     fi
     
-    # Switch URL map to standby backend (like failover.sh)
     log_info "Switching load balancer to standby region..."
     URL_MAP=$(gcloud compute url-maps list --project="$PROJECT_ID" --filter="name~dr-url-map" --format="value(name)" | head -1)
     
@@ -346,8 +323,6 @@ if [ "$SIMULATE_FAILURE" = true ]; then
         record_test "fail" "RTO exceeded: ${RTO_ACTUAL}s (target: 900s)"
     fi
     
-    # Wait for load balancer (global LB health checks need time to propagate)
-    # Need at least 2 minutes for health checks + propagation
     log_info "Waiting 120 seconds for load balancer health checks..."
     sleep 120
     
@@ -381,7 +356,6 @@ if [ "$SIMULATE_FAILURE" = true ]; then
         log_step "Executing failback to primary region..."
         FAILBACK_START=$(date +%s)
         
-        # Scale up primary
         gcloud compute instance-groups managed resize "$PRIMARY_MIG" \
             --size=2 \
             --region="$PRIMARY_REGION" \
@@ -390,14 +364,12 @@ if [ "$SIMULATE_FAILURE" = true ]; then
         
         log_info "Waiting for primary instances..."
         
-        # Reset wait variables for failback (longer timeout due to auto-healing delay)
         MAX_WAIT_FAILBACK=420
         WAIT_INTERVAL_FAILBACK=15
         ELAPSED=0
         PRIMARY_COUNT=0
         
         while [ $ELAPSED -lt $MAX_WAIT_FAILBACK ]; do
-            # Check if MIG is stable with target size
             MIG_STATUS=$(gcloud compute instance-groups managed describe "$PRIMARY_MIG" \
                 --region="$PRIMARY_REGION" \
                 --project="$PROJECT_ID" \
@@ -405,13 +377,11 @@ if [ "$SIMULATE_FAILURE" = true ]; then
             IS_STABLE=$(echo "$MIG_STATUS" | cut -f1)
             TARGET_SIZE=$(echo "$MIG_STATUS" | cut -f2)
             
-            # Get instance count - use 'status' field which appears earlier than instanceStatus
             INSTANCE_LIST=$(gcloud compute instance-groups managed list-instances "$PRIMARY_MIG" \
                 --region="$PRIMARY_REGION" \
                 --project="$PROJECT_ID" \
                 --format="value(instance,status)" 2>/dev/null || echo "")
             
-            # Count RUNNING instances
             if [ -z "$INSTANCE_LIST" ]; then
                 CURRENT=0
             else
@@ -425,7 +395,6 @@ if [ "$SIMULATE_FAILURE" = true ]; then
                 fi
             fi
             
-            # Exit if stable OR if we have 2 RUNNING instances (don't wait for auto-healing)
             if [ "$IS_STABLE" = "True" ] && [ "$TARGET_SIZE" = "2" ]; then
                 PRIMARY_COUNT=2
                 log_success "Primary instances are ready (stable)!"
@@ -441,7 +410,6 @@ if [ "$SIMULATE_FAILURE" = true ]; then
             ELAPSED=$((ELAPSED + WAIT_INTERVAL_FAILBACK))
         done
         
-        # Switch URL map back to primary backend FIRST (before scaling down standby)
         log_info "Switching load balancer back to primary region..."
         URL_MAP=$(gcloud compute url-maps list --project="$PROJECT_ID" --filter="name~dr-url-map" --format="value(name)" | head -1)
         
@@ -454,7 +422,6 @@ if [ "$SIMULATE_FAILURE" = true ]; then
             log_success "Load balancer switched back to primary"
         fi
         
-        # Now scale down standby (after LB is pointing to primary)
         log_info "Scaling down standby region..."
         gcloud compute instance-groups managed resize "$STANDBY_MIG" \
             --size=0 \
@@ -473,7 +440,6 @@ if [ "$SIMULATE_FAILURE" = true ]; then
             record_test "fail" "Failback incomplete - only $PRIMARY_COUNT instances"
         fi
         
-        # Wait for LB health checks to propagate (global LB needs time)
         log_info "Waiting 90 seconds for LB health checks..."
         sleep 90
         
@@ -487,7 +453,6 @@ if [ "$SIMULATE_FAILURE" = true ]; then
             record_test "fail" "Service unavailable after failback (HTTP $FINAL_STATUS)"
         fi
     else
-        # Restore original state
         log_header "Phase 4: Restore Original State"
         echo ""
         
@@ -509,7 +474,6 @@ if [ "$SIMULATE_FAILURE" = true ]; then
     fi
 fi
 
-# Calculate test duration
 TEST_END=$(date +%s)
 TEST_DURATION=$((TEST_END - TEST_START))
 
@@ -521,7 +485,6 @@ echo "  Test Duration:    ${TEST_DURATION} seconds"
 echo "  Tests Passed:     $TESTS_PASSED"
 echo "  Tests Failed:     $TESTS_FAILED"
 echo "  Total Tests:      $TESTS_TOTAL"
-# Calculate percentage without bc (integer math)
 if [ "$TESTS_TOTAL" -gt 0 ]; then
     SUCCESS_RATE=$((TESTS_PASSED * 100 / TESTS_TOTAL))
 else
@@ -537,7 +500,6 @@ fi
 
 echo ""
 
-# Generate report file if requested
 if [ -n "$REPORT_FILE" ]; then
     cat > "$REPORT_FILE" << EOF
 # DR Test Report
@@ -567,7 +529,6 @@ EOF
     log_success "Report saved to: $REPORT_FILE"
 fi
 
-# Exit with appropriate code
 if [ "$TESTS_FAILED" -gt 0 ]; then
     log_error "DR test completed with failures"
     exit 1

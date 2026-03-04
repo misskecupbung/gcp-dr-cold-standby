@@ -1,10 +1,5 @@
-# =============================================================================
-# Health Check Configuration
-# Apply with: gcloud compute health-checks create http dr-health-check --config-file=health-check.yaml
-# =============================================================================
-
-# This YAML represents the health check configuration deployed by Terraform
-# Use this as reference for manual health check creation or modifications
+# Health check configuration
+# Deployed by Terraform - for reference/manual use
 
 name: dr-health-check
 description: "Health check for DR Cold Standby Lab application"
@@ -30,9 +25,6 @@ logConfig:
   enable: true
 
 ---
-# Regional Health Check for Auto-healing
-# =============================================================================
-
 name: dr-autohealing-health-check
 description: "Health check for MIG auto-healing"
 

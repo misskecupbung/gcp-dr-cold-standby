@@ -1,6 +1,5 @@
-# =============================================================================
-# Project Configuration
-# =============================================================================
+# Project
+
 variable "project_id" {
   description = "The GCP project ID"
   type        = string
@@ -12,9 +11,8 @@ variable "project_name" {
   default     = "DR Cold Standby Lab"
 }
 
-# =============================================================================
-# Region Configuration
-# =============================================================================
+# Regions
+
 variable "primary_region" {
   description = "Primary region for the application"
   type        = string
@@ -39,9 +37,8 @@ variable "standby_zone" {
   default     = "us-east1-b"
 }
 
-# =============================================================================
-# Networking Configuration
-# =============================================================================
+# Networking
+
 variable "network_name" {
   description = "Name of the VPC network"
   type        = string
@@ -60,9 +57,8 @@ variable "standby_subnet_cidr" {
   default     = "10.0.2.0/24"
 }
 
-# =============================================================================
-# Compute Configuration
-# =============================================================================
+# Compute
+
 variable "machine_type_serving" {
   description = "Machine type for serving instances"
   type        = string
@@ -99,9 +95,8 @@ variable "image_project" {
   default     = "debian-cloud"
 }
 
-# =============================================================================
-# Instance Group Configuration
-# =============================================================================
+# Instance Groups
+
 variable "primary_min_replicas" {
   description = "Minimum number of instances in primary MIG"
   type        = number
@@ -132,9 +127,8 @@ variable "target_cpu_utilization" {
   default     = 0.7
 }
 
-# =============================================================================
-# Health Check Configuration
-# =============================================================================
+# Health Checks
+
 variable "health_check_port" {
   description = "Port for health checks"
   type        = number
@@ -171,9 +165,8 @@ variable "unhealthy_threshold" {
   default     = 3
 }
 
-# =============================================================================
-# DNS Configuration
-# =============================================================================
+# DNS
+
 variable "dns_zone_name" {
   description = "Name of the Cloud DNS managed zone"
   type        = string
@@ -198,9 +191,8 @@ variable "enable_dns" {
   default     = false
 }
 
-# =============================================================================
-# Snapshot Configuration
-# =============================================================================
+# Snapshots
+
 variable "snapshot_schedule_hours" {
   description = "Hours between snapshots"
   type        = number
@@ -213,9 +205,8 @@ variable "snapshot_retention_days" {
   default     = 7
 }
 
-# =============================================================================
-# Monitoring Configuration
-# =============================================================================
+# Monitoring
+
 variable "enable_monitoring" {
   description = "Enable Cloud Monitoring and alerting"
   type        = bool
@@ -234,9 +225,8 @@ variable "uptime_check_period" {
   default     = "60s"
 }
 
-# =============================================================================
-# Labels and Tags
-# =============================================================================
+# Labels & Tags
+
 variable "environment" {
   description = "Environment name (e.g., dev, staging, prod)"
   type        = string

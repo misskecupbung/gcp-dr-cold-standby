@@ -1,10 +1,5 @@
-# =============================================================================
-# DNS Module - Cloud DNS Configuration
-# =============================================================================
+# DNS module - Cloud DNS configuration
 
-# =============================================================================
-# Cloud DNS Managed Zone
-# =============================================================================
 resource "google_dns_managed_zone" "primary" {
   name        = var.dns_zone_name
   project     = var.project_id
@@ -23,9 +18,6 @@ resource "google_dns_managed_zone" "primary" {
   }
 }
 
-# =============================================================================
-# A Record - Points to Load Balancer
-# =============================================================================
 resource "google_dns_record_set" "app" {
   name         = var.domain_name
   type         = "A"
@@ -36,9 +28,6 @@ resource "google_dns_record_set" "app" {
   rrdatas = [var.lb_ip_address]
 }
 
-# =============================================================================
-# CNAME Record - www subdomain
-# =============================================================================
 resource "google_dns_record_set" "www" {
   name         = "www.${var.domain_name}"
   type         = "CNAME"

@@ -1,10 +1,5 @@
-# =============================================================================
-# Networking Module - VPC, Subnets, Firewall Rules
-# =============================================================================
+# Networking module - VPC, subnets, firewall rules
 
-# =============================================================================
-# VPC Network
-# =============================================================================
 resource "google_compute_network" "vpc" {
   name                    = var.network_name
   project                 = var.project_id
@@ -12,9 +7,6 @@ resource "google_compute_network" "vpc" {
   routing_mode            = "GLOBAL"
 }
 
-# =============================================================================
-# Subnets
-# =============================================================================
 resource "google_compute_subnetwork" "primary" {
   name          = "${var.network_name}-primary-subnet"
   project       = var.project_id
@@ -47,9 +39,6 @@ resource "google_compute_subnetwork" "standby" {
   }
 }
 
-# =============================================================================
-# Cloud Router & NAT (for private instances)
-# =============================================================================
 resource "google_compute_router" "primary" {
   name    = "${var.network_name}-router-primary"
   project = var.project_id
@@ -92,11 +81,6 @@ resource "google_compute_router_nat" "standby" {
   }
 }
 
-# =============================================================================
-# Firewall Rules
-# =============================================================================
-
-# Allow internal communication
 resource "google_compute_firewall" "allow_internal" {
   name    = "${var.network_name}-allow-internal"
   project = var.project_id
@@ -120,7 +104,6 @@ resource "google_compute_firewall" "allow_internal" {
   priority      = 1000
 }
 
-# Allow SSH from IAP
 resource "google_compute_firewall" "allow_iap_ssh" {
   name    = "${var.network_name}-allow-iap-ssh"
   project = var.project_id
@@ -131,12 +114,11 @@ resource "google_compute_firewall" "allow_iap_ssh" {
     ports    = ["22"]
   }
 
-  source_ranges = ["35.235.240.0/20"]  # IAP IP range
-  target_tags   = ["dr-app"]
+  source_ranges = ["35.235.240.0/20"]
+  target_tags   = ["dr-app"]]
   priority      = 1000
 }
 
-# Allow health checks from Google
 resource "google_compute_firewall" "allow_health_check" {
   name    = "${var.network_name}-allow-health-check"
   project = var.project_id
@@ -147,13 +129,11 @@ resource "google_compute_firewall" "allow_health_check" {
     ports    = ["8080", "80", "443"]
   }
 
-  # Google Cloud health check IP ranges
   source_ranges = ["35.191.0.0/16", "130.211.0.0/22"]
-  target_tags   = ["dr-app", "http-server", "https-server"]
+  target_tags   = ["dr-app", "http-server", "https-server"]]
   priority      = 1000
 }
 
-# Allow HTTP/HTTPS from anywhere (for Load Balancer)
 resource "google_compute_firewall" "allow_http_https" {
   name    = "${var.network_name}-allow-http-https"
   project = var.project_id

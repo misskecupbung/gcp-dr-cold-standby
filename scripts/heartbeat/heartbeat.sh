@@ -1,23 +1,17 @@
 #!/bin/bash
-# =============================================================================
-# Heartbeat Monitoring Script
-# Runs on the heartbeat instance to monitor primary region health
-# =============================================================================
+# Heartbeat monitor - checks primary region health
 
 set -e
 
-# Configuration from instance metadata
 PROJECT_ID=$(curl -s "http://metadata.google.internal/computeMetadata/v1/instance/attributes/PROJECT_ID" -H "Metadata-Flavor: Google")
 PRIMARY_MIG=$(curl -s "http://metadata.google.internal/computeMetadata/v1/instance/attributes/PRIMARY_MIG" -H "Metadata-Flavor: Google")
 STANDBY_MIG=$(curl -s "http://metadata.google.internal/computeMetadata/v1/instance/attributes/STANDBY_MIG" -H "Metadata-Flavor: Google")
 PRIMARY_REGION=$(curl -s "http://metadata.google.internal/computeMetadata/v1/instance/attributes/PRIMARY_REGION" -H "Metadata-Flavor: Google")
 STANDBY_REGION=$(curl -s "http://metadata.google.internal/computeMetadata/v1/instance/attributes/STANDBY_REGION" -H "Metadata-Flavor: Google")
 
-# Logging configuration
 LOG_FILE="/var/log/heartbeat/heartbeat.log"
 mkdir -p /var/log/heartbeat
 
-# Functions
 timestamp() {
     date -u +"%Y-%m-%dT%H:%M:%SZ"
 }
@@ -30,7 +24,6 @@ log_console() {
     echo "$(timestamp) - $1" | tee -a "$LOG_FILE"
 }
 
-# Health check function
 check_primary_health() {
     local healthy_count
     healthy_count=$(gcloud compute instance-groups managed list-instances "$PRIMARY_MIG" \
@@ -42,7 +35,6 @@ check_primary_health() {
     echo "$healthy_count"
 }
 
-# Check standby status
 check_standby_status() {
     local standby_count
     standby_count=$(gcloud compute instance-groups managed list-instances "$STANDBY_MIG" \
@@ -53,7 +45,6 @@ check_standby_status() {
     echo "$standby_count"
 }
 
-# Write custom metric
 write_metric() {
     local metric_name=$1
     local value=$2
@@ -66,14 +57,12 @@ write_metric() {
         2>/dev/null || log "Failed to write metric: $metric_name"
 }
 
-# Main monitoring loop
 main() {
     log_console "Starting heartbeat monitoring..."
     log_console "Project: $PROJECT_ID"
     log_console "Primary MIG: $PRIMARY_MIG ($PRIMARY_REGION)"
     log_console "Standby MIG: $STANDBY_MIG ($STANDBY_REGION)"
     
-    # Failure threshold configuration
     FAILURE_THRESHOLD=3
     CONSECUTIVE_FAILURES=0
     
@@ -115,7 +104,6 @@ main() {
     done
 }
 
-# Run if executed directly
 if [ "${BASH_SOURCE[0]}" == "${0}" ]; then
     main
 fi

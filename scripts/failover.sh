@@ -1,13 +1,11 @@
 #!/bin/bash
-# =============================================================================
-# Failover Script - Activate Standby Region
-# =============================================================================
+# Failover script - activates the standby region
+
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -21,13 +19,11 @@ log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 log_step() { echo -e "${CYAN}[STEP]${NC} $1"; }
 
-# Banner
 echo "============================================================"
-echo "   GCP DR Cold Standby Lab - FAILOVER"
+echo "  DR Cold Standby Lab - FAILOVER"
 echo "============================================================"
 echo ""
 
-# Get configuration from Terraform
 cd "$PROJECT_ROOT/terraform"
 
 log_info "Loading configuration from Terraform state..."
@@ -47,7 +43,6 @@ echo "  Standby MIG:     $STANDBY_MIG ($STANDBY_REGION)"
 echo "  Load Balancer:   $LB_IP"
 echo ""
 
-# Parse arguments
 AUTO_APPROVE=false
 STANDBY_SIZE=2
 
@@ -77,9 +72,8 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Confirm failover
-log_warning "This will initiate a FAILOVER to the standby region!"
-log_warning "Primary region will be scaled down and standby will be activated."
+log_warning "This will initiate FAILOVER to the standby region!"
+log_warning "Primary will be scaled down, standby will be activated."
 echo ""
 
 if [ "$AUTO_APPROVE" = false ]; then
@@ -95,18 +89,15 @@ echo ""
 log_info "Starting failover at $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 echo ""
 
-# Step 0: Disable autoscalers (required before manual resize)
-log_step "Step 0: Disabling autoscalers for manual control..."
+log_step "Step 0: Disabling autoscalers..."
 
-# Stop autoscaling on primary MIG
-log_info "  Stopping autoscaling on primary MIG..."
+log_info "  Stopping autoscaling on primary..."
 gcloud compute instance-groups managed stop-autoscaling "$PRIMARY_MIG" \
     --region="$PRIMARY_REGION" \
     --project="$PROJECT_ID" \
     --quiet 2>/dev/null || log_warning "  Primary autoscaler not found or already stopped"
 
-# Stop autoscaling on standby MIG
-log_info "  Stopping autoscaling on standby MIG..."
+log_info "  Stopping autoscaling on standby..."
 gcloud compute instance-groups managed stop-autoscaling "$STANDBY_MIG" \
     --region="$STANDBY_REGION" \
     --project="$PROJECT_ID" \
@@ -115,8 +106,7 @@ gcloud compute instance-groups managed stop-autoscaling "$STANDBY_MIG" \
 log_success "Autoscalers disabled"
 echo ""
 
-# Step 1: Create snapshot of primary disks (if possible)
-log_step "Step 1: Creating emergency snapshot of primary region..."
+log_step "Step 1: Creating emergency snapshot of primary..."
 PRIMARY_INSTANCES=$(gcloud compute instance-groups managed list-instances "$PRIMARY_MIG" \
     --region="$PRIMARY_REGION" \
     --project="$PROJECT_ID" \
@@ -146,7 +136,6 @@ else
     log_warning "No primary instances found or accessible"
 fi
 
-# Step 2: Scale down primary region
 log_step "Step 2: Scaling down primary region..."
 gcloud compute instance-groups managed resize "$PRIMARY_MIG" \
     --size=0 \
@@ -155,8 +144,7 @@ gcloud compute instance-groups managed resize "$PRIMARY_MIG" \
     --quiet
 log_success "Primary region scaled to 0 instances"
 
-# Step 3: Scale up standby region
-log_step "Step 3: Scaling up standby region to $STANDBY_SIZE instances..."
+log_step "Step 3: Scaling up standby to $STANDBY_SIZE instances..."
 gcloud compute instance-groups managed resize "$STANDBY_MIG" \
     --size="$STANDBY_SIZE" \
     --region="$STANDBY_REGION" \
@@ -164,7 +152,6 @@ gcloud compute instance-groups managed resize "$STANDBY_MIG" \
     --quiet
 log_success "Standby region scale-up initiated"
 
-# Step 4: Wait for standby instances to be healthy
 log_step "Step 4: Waiting for standby instances to become healthy..."
 MAX_WAIT=600
 WAIT_INTERVAL=15
@@ -186,12 +173,10 @@ while [ $ELAPSED -lt $MAX_WAIT ]; do
         break
     fi
     
-    # Get actual running count by listing instances
     HEALTHY_COUNT=$(gcloud compute instance-groups managed list-instances "$STANDBY_MIG" \
         --region="$STANDBY_REGION" \
         --project="$PROJECT_ID" \
         --format="value(status)" 2>/dev/null | grep -c "RUNNING" || echo 0)
-    # Ensure HEALTHY_COUNT is a valid integer
     HEALTHY_COUNT=$(echo "$HEALTHY_COUNT" | tr -d '\n' | head -1)
     HEALTHY_COUNT=${HEALTHY_COUNT:-0}
     
@@ -213,23 +198,18 @@ if [ $ELAPSED -ge $MAX_WAIT ]; then
         --project="$PROJECT_ID"
 fi
 
-# Step 5: Switch URL map to standby backend
-log_step "Step 5: Switching load balancer to standby region..."
+log_step "Step 5: Switching load balancer to standby..."
 
-# Get URL map name
 URL_MAP=$(gcloud compute url-maps list --project="$PROJECT_ID" --filter="name~dr-url-map" --format="value(name)" | head -1)
 
 if [ -n "$URL_MAP" ]; then
     log_info "  URL Map: $URL_MAP"
     
-    # Export, modify, and import URL map (handles path_matcher routing)
     TEMP_FILE="/tmp/url-map-failover-$$.yaml"
     gcloud compute url-maps export "$URL_MAP" --global --project="$PROJECT_ID" --destination="$TEMP_FILE" 2>/dev/null
     
-    # Replace all primary backend references with standby
     sed -i 's/dr-backend-primary/dr-backend-standby/g' "$TEMP_FILE"
     
-    # Import the modified URL map
     gcloud compute url-maps import "$URL_MAP" --global --project="$PROJECT_ID" --source="$TEMP_FILE" --quiet 2>/dev/null
     
     rm -f "$TEMP_FILE"
@@ -238,9 +218,8 @@ else
     log_error "Could not find URL map"
 fi
 
-# Step 6: Verify load balancer health
 log_step "Step 6: Verifying load balancer health..."
-sleep 30  # Give LB time to detect healthy backends
+sleep 30
 
 LB_TEST_RESULT=$(curl -s -o /dev/null -w "%{http_code}" "http://$LB_IP/health" 2>/dev/null || echo "000")
 if [ "$LB_TEST_RESULT" = "200" ]; then
@@ -249,13 +228,12 @@ else
     log_warning "Load balancer health check returned: $LB_TEST_RESULT (may need more time)"
 fi
 
-# Calculate failover time
 FAILOVER_END=$(date +%s)
 FAILOVER_DURATION=$((FAILOVER_END - FAILOVER_START))
 
 echo ""
 echo "============================================================"
-echo "   FAILOVER COMPLETE"
+echo "  FAILOVER COMPLETE"
 echo "============================================================"
 echo ""
 echo "  Failover Duration: ${FAILOVER_DURATION} seconds"

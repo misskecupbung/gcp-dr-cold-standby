@@ -1,13 +1,11 @@
 #!/bin/bash
-# =============================================================================
-# Deploy Script - Deploy DR Infrastructure
-# =============================================================================
+# Deploy script - runs terraform to create the DR infrastructure
+
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -19,19 +17,16 @@ log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
 log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
-# Banner
 echo "============================================================"
-echo "   GCP DR Cold Standby Lab - Deployment"
+echo "  DR Cold Standby Lab - Deploy"
 echo "============================================================"
 echo ""
 
-# Check if terraform.tfvars exists
 if [ ! -f "$PROJECT_ROOT/terraform/terraform.tfvars" ]; then
     log_error "terraform.tfvars not found. Run ./scripts/setup.sh first"
     exit 1
 fi
 
-# Parse arguments
 PLAN_ONLY=false
 AUTO_APPROVE=false
 
@@ -63,8 +58,7 @@ done
 
 cd "$PROJECT_ROOT/terraform"
 
-# Terraform plan
-log_info "Running Terraform plan..."
+log_info "Running terraform plan..."
 terraform plan -out=tfplan
 
 if [ "$PLAN_ONLY" = true ]; then
@@ -72,37 +66,33 @@ if [ "$PLAN_ONLY" = true ]; then
     exit 0
 fi
 
-# Confirm before apply
 if [ "$AUTO_APPROVE" = false ]; then
     echo ""
-    read -p "Do you want to apply these changes? (yes/no): " CONFIRM
+    read -p "Apply these changes? (yes/no): " CONFIRM
     if [ "$CONFIRM" != "yes" ]; then
         log_warning "Deployment cancelled"
         exit 0
     fi
 fi
 
-# Terraform apply
-log_info "Applying Terraform configuration..."
+log_info "Applying terraform configuration..."
 terraform apply tfplan
 
-# Clean up plan file
 rm -f tfplan
 
-# Display outputs
 echo ""
 echo "============================================================"
-echo "   Deployment Complete!"
+echo "  Deployment Complete"
 echo "============================================================"
 echo ""
-log_info "Resource Summary:"
+log_info "Resources:"
 terraform output -json | jq -r 'to_entries[] | "  \(.key): \(.value.value)"'
 
 echo ""
-log_success "Infrastructure deployed successfully!"
+log_success "Infrastructure deployed!"
 echo ""
 echo "============================================================"
-echo "   Next Steps:"
+echo "  Next Steps"
 echo "============================================================"
 echo ""
 echo "1. Wait 3-5 minutes for instances to start and configure"

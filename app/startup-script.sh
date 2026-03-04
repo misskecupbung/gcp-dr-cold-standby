@@ -1,31 +1,22 @@
 #!/bin/bash
-# =============================================================================
-# VM Startup Script
-# This script is executed on VM startup to configure the application
-# =============================================================================
+# VM startup script - sets up the app and nginx
 
 set -e
 
-# Logging
 exec > >(tee /var/log/startup-script.log) 2>&1
 echo "Starting VM configuration at $(date)"
 
-# Install required packages
 apt-get update
 apt-get install -y python3-pip python3-venv nginx curl jq
 
-# Create application directory
 mkdir -p /opt/app
 cd /opt/app
 
-# Create virtual environment
 python3 -m venv venv
 source venv/bin/activate
 
-# Install Python dependencies
 pip install flask gunicorn
 
-# Create application file
 cat > /opt/app/main.py << 'APPEOF'
 from flask import Flask, jsonify
 import socket
@@ -64,11 +55,9 @@ if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
 APPEOF
 
-# Get region from metadata
 REGION=$(curl -s "http://metadata.google.internal/computeMetadata/v1/instance/zone" \
     -H "Metadata-Flavor: Google" | cut -d'/' -f4 | cut -d'-' -f1-2)
 
-# Create systemd service
 cat > /etc/systemd/system/dr-app.service << SERVICEEOF
 [Unit]
 Description=DR Lab Application
@@ -87,12 +76,10 @@ RestartSec=5
 WantedBy=multi-user.target
 SERVICEEOF
 
-# Start application service
 systemctl daemon-reload
 systemctl enable dr-app
 systemctl start dr-app
 
-# Configure nginx as reverse proxy
 cat > /etc/nginx/sites-available/dr-app << 'NGINXEOF'
 server {
     listen 80;
@@ -117,4 +104,4 @@ ln -sf /etc/nginx/sites-available/dr-app /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
 systemctl restart nginx
 
-echo "Startup script completed successfully at $(date)"
+echo "Startup complete at $(date)"

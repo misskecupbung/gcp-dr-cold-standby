@@ -1,14 +1,9 @@
-# =============================================================================
-# Compute Module - Instance Templates and Managed Instance Groups
-# =============================================================================
+# Compute module - instance templates and managed instance groups
 
 locals {
   role_prefix = var.is_primary ? "primary" : "standby"
 }
 
-# =============================================================================
-# Service Account
-# =============================================================================
 resource "google_service_account" "compute_sa" {
   account_id   = "dr-${local.role_prefix}-sa-${var.name_suffix}"
   display_name = "DR ${title(local.role_prefix)} Compute Service Account"
@@ -28,9 +23,6 @@ resource "google_project_iam_member" "compute_sa_roles" {
   member  = "serviceAccount:${google_service_account.compute_sa.email}"
 }
 
-# =============================================================================
-# Instance Template
-# =============================================================================
 resource "google_compute_instance_template" "app" {
   name_prefix  = "dr-${local.role_prefix}-template-"
   project      = var.project_id
@@ -171,7 +163,6 @@ resource "google_compute_instance_template" "app" {
       systemctl enable dr-app
       systemctl start dr-app
 
-      # Configure nginx as reverse proxy (optional, for port 80)
       cat > /etc/nginx/sites-available/dr-app << 'NGINXEOF'
       server {
           listen 80;
@@ -189,8 +180,7 @@ resource "google_compute_instance_template" "app" {
       rm -f /etc/nginx/sites-enabled/default
       systemctl restart nginx
 
-      # Log completion
-      echo "Startup script completed successfully" | logger -t startup-script
+      echo "Startup complete" | logger -t startup-script
     EOF
   }
 
@@ -199,9 +189,6 @@ resource "google_compute_instance_template" "app" {
   }
 }
 
-# =============================================================================
-# Health Check
-# =============================================================================
 resource "google_compute_health_check" "app" {
   name    = "dr-${local.role_prefix}-health-check-${var.name_suffix}"
   project = var.project_id
@@ -221,9 +208,6 @@ resource "google_compute_health_check" "app" {
   }
 }
 
-# =============================================================================
-# Regional Managed Instance Group
-# =============================================================================
 resource "google_compute_region_instance_group_manager" "app" {
   name    = "dr-${local.role_prefix}-mig-${var.name_suffix}"
   project = var.project_id
@@ -265,9 +249,6 @@ resource "google_compute_region_instance_group_manager" "app" {
   }
 }
 
-# =============================================================================
-# Autoscaler
-# =============================================================================
 resource "google_compute_region_autoscaler" "app" {
   name    = "dr-${local.role_prefix}-autoscaler-${var.name_suffix}"
   project = var.project_id

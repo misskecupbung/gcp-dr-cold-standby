@@ -1,10 +1,5 @@
-# =============================================================================
-# Terraform Outputs
-# =============================================================================
+# Outputs
 
-# -----------------------------------------------------------------------------
-# Load Balancer Outputs
-# -----------------------------------------------------------------------------
 output "load_balancer_ip" {
   description = "Global Load Balancer IP address"
   value       = module.load_balancing.lb_ip_address
@@ -15,9 +10,6 @@ output "load_balancer_url" {
   value       = "http://${module.load_balancing.lb_ip_address}"
 }
 
-# -----------------------------------------------------------------------------
-# DNS Outputs
-# -----------------------------------------------------------------------------
 output "dns_zone_name" {
   description = "Cloud DNS managed zone name"
   value       = var.enable_dns ? module.dns[0].zone_name : "DNS disabled"
@@ -33,9 +25,6 @@ output "application_url" {
   value       = var.enable_dns ? "http://${trimsuffix(var.domain_name, ".")}" : "http://${module.load_balancing.lb_ip_address}"
 }
 
-# -----------------------------------------------------------------------------
-# Compute Outputs - Primary Region
-# -----------------------------------------------------------------------------
 output "primary_mig_name" {
   description = "Primary region Managed Instance Group name"
   value       = module.compute_primary.mig_name
@@ -51,9 +40,6 @@ output "primary_instance_template" {
   value       = module.compute_primary.instance_template_name
 }
 
-# -----------------------------------------------------------------------------
-# Compute Outputs - Standby Region
-# -----------------------------------------------------------------------------
 output "standby_mig_name" {
   description = "Standby region Managed Instance Group name"
   value       = module.compute_standby.mig_name
@@ -69,9 +55,6 @@ output "standby_instance_template" {
   value       = module.compute_standby.instance_template_name
 }
 
-# -----------------------------------------------------------------------------
-# Heartbeat Outputs
-# -----------------------------------------------------------------------------
 output "heartbeat_primary_mig" {
   description = "Heartbeat primary MIG self link"
   value       = module.heartbeat.heartbeat_primary_mig
@@ -82,9 +65,6 @@ output "heartbeat_standby_mig" {
   value       = module.heartbeat.heartbeat_standby_mig
 }
 
-# -----------------------------------------------------------------------------
-# Networking Outputs
-# -----------------------------------------------------------------------------
 output "network_name" {
   description = "VPC network name"
   value       = module.networking.network_name
@@ -100,9 +80,6 @@ output "standby_subnet_name" {
   value       = module.networking.standby_subnet_name
 }
 
-# -----------------------------------------------------------------------------
-# Snapshot Outputs
-# -----------------------------------------------------------------------------
 output "snapshot_policy_name" {
   description = "Snapshot schedule policy name"
   value       = module.snapshot.snapshot_policy_name
@@ -113,17 +90,11 @@ output "snapshot_policy_id" {
   value       = module.snapshot.snapshot_policy_id
 }
 
-# -----------------------------------------------------------------------------
-# Monitoring Outputs
-# -----------------------------------------------------------------------------
 output "monitoring_dashboard_url" {
   description = "Cloud Monitoring dashboard URL"
   value       = var.enable_monitoring ? "https://console.cloud.google.com/monitoring/dashboards?project=${var.project_id}" : "Monitoring disabled"
 }
 
-# -----------------------------------------------------------------------------
-# Helpful Commands
-# -----------------------------------------------------------------------------
 output "helpful_commands" {
   description = "Useful commands for managing the DR setup"
   value = {
@@ -135,9 +106,6 @@ output "helpful_commands" {
   }
 }
 
-# -----------------------------------------------------------------------------
-# DR Recovery Information
-# -----------------------------------------------------------------------------
 output "dr_recovery_info" {
   description = "Information needed for DR recovery"
   value = {

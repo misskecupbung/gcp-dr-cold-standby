@@ -1,10 +1,5 @@
-# =============================================================================
-# Snapshot Module - Persistent Disk Snapshot Policies
-# =============================================================================
+# Snapshot module - persistent disk snapshot policies
 
-# =============================================================================
-# Snapshot Schedule Policy
-# =============================================================================
 resource "google_compute_resource_policy" "snapshot_schedule" {
   name    = "dr-snapshot-policy"
   project = var.project_id
@@ -35,9 +30,6 @@ resource "google_compute_resource_policy" "snapshot_schedule" {
   }
 }
 
-# =============================================================================
-# Storage Bucket for Snapshot Metadata (used by heartbeat system)
-# =============================================================================
 resource "google_storage_bucket" "snapshot_metadata" {
   name          = "${var.project_id}-dr-snapshot-metadata"
   project       = var.project_id

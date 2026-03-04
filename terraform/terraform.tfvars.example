@@ -1,8 +1,6 @@
-# =============================================================================
-# Terraform Variables - Auto-configured by setup.sh
-# =============================================================================
+# DR Cold Standby Lab - terraform variables
+# Auto-configured by setup.sh
 
-# Project Configuration (auto-filled by setup.sh)
 project_id   = "your-gcp-project-id"
 
 # Region Configuration
@@ -25,7 +23,7 @@ data_disk_size         = 100
 # Instance Group Configuration
 primary_min_replicas   = 2
 primary_max_replicas   = 5
-standby_min_replicas   = 0  # Cold standby - no instances running
+standby_min_replicas   = 0
 standby_max_replicas   = 5
 target_cpu_utilization = 0.7
 
@@ -37,7 +35,6 @@ health_check_timeout  = 5
 healthy_threshold     = 2
 unhealthy_threshold   = 3
 
-# DNS Configuration (optional - set enable_dns = false to skip)
 enable_dns    = false
 dns_zone_name = "dr-zone"
 domain_name   = "dr.example.com."
@@ -47,12 +44,10 @@ dns_ttl       = 300
 snapshot_schedule_hours    = 1
 snapshot_retention_days    = 7
 
-# Monitoring Configuration (auto-filled by setup.sh)
 enable_monitoring    = true
 notification_email   = "your-email@example.com"
 uptime_check_period  = "60s"
 
-# Labels (auto-filled by setup.sh)
 environment = "lab"
 labels = {
   managed-by = "terraform"

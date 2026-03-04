@@ -1,18 +1,13 @@
 #!/bin/bash
-# =============================================================================
-# Snapshot Manager Script
-# Manages snapshot lifecycle and replication for DR
-# =============================================================================
+# Snapshot manager - handles DR snapshot lifecycle
 
 set -e
 
-# Configuration from instance metadata
 PROJECT_ID=$(curl -s "http://metadata.google.internal/computeMetadata/v1/instance/attributes/PROJECT_ID" -H "Metadata-Flavor: Google")
 PRIMARY_MIG=$(curl -s "http://metadata.google.internal/computeMetadata/v1/instance/attributes/PRIMARY_MIG" -H "Metadata-Flavor: Google")
 PRIMARY_REGION=$(curl -s "http://metadata.google.internal/computeMetadata/v1/instance/attributes/PRIMARY_REGION" -H "Metadata-Flavor: Google")
 STANDBY_REGION=$(curl -s "http://metadata.google.internal/computeMetadata/v1/instance/attributes/STANDBY_REGION" -H "Metadata-Flavor: Google")
 
-# Snapshot configuration
 SNAPSHOT_PREFIX="dr-snapshot"
 RETENTION_DAYS=7
 LOG_FILE="/var/log/heartbeat/snapshot.log"
@@ -21,7 +16,6 @@ STATE_FILE="/var/lib/heartbeat/snapshot_state.json"
 mkdir -p /var/log/heartbeat
 mkdir -p /var/lib/heartbeat
 
-# Functions
 timestamp() {
     date -u +"%Y-%m-%dT%H:%M:%SZ"
 }
@@ -34,7 +28,6 @@ log_console() {
     echo "$(timestamp) - $1" | tee -a "$LOG_FILE"
 }
 
-# Get all disks attached to primary instances
 get_primary_disks() {
     local instances
     instances=$(gcloud compute instance-groups managed list-instances "$PRIMARY_MIG" \
@@ -63,7 +56,6 @@ get_primary_disks() {
     echo "$disks"
 }
 
-# Create snapshot for a disk
 create_snapshot() {
     local disk_name=$1
     local zone=$2
@@ -89,7 +81,6 @@ create_snapshot() {
     fi
 }
 
-# List all DR snapshots
 list_snapshots() {
     gcloud compute snapshots list \
         --project="$PROJECT_ID" \
@@ -98,7 +89,6 @@ list_snapshots() {
         2>/dev/null
 }
 
-# Clean up old snapshots
 cleanup_old_snapshots() {
     local cutoff_date
     cutoff_date=$(date -d "-${RETENTION_DAYS} days" -u +"%Y-%m-%dT%H:%M:%SZ" 2>/dev/null || \
@@ -119,7 +109,6 @@ cleanup_old_snapshots() {
     done
 }
 
-# Get latest snapshot for a disk
 get_latest_snapshot() {
     local disk_name=$1
     
@@ -131,7 +120,6 @@ get_latest_snapshot() {
         --format="value(name)" 2>/dev/null
 }
 
-# Check snapshot policy status
 check_policy_snapshots() {
     log "Checking policy-based snapshots..."
     
@@ -149,9 +137,8 @@ check_policy_snapshots() {
     fi
 }
 
-# Main execution
 main() {
-    local action=${1:-"status"}
+    local action=${1:-"status"}}
     
     case "$action" in
         create)
@@ -195,7 +182,6 @@ main() {
     esac
 }
 
-# Run if executed directly
 if [ "${BASH_SOURCE[0]}" == "${0}" ]; then
     main "$@"
 fi

@@ -1,14 +1,7 @@
-# =============================================================================
-# Cloud Monitoring Alerting Policies
-# Reference configuration for DR alerting
-# =============================================================================
-
-# These policies are created by Terraform but documented here for reference
-# Manual creation: gcloud alpha monitoring policies create --policy-from-file=alerting-policy.yaml
+# Cloud Monitoring alerting policies
+# These are created by Terraform - documented here for reference
 
 ---
-# Alert 1: Primary Region Instance Count Low
-# =============================================================================
 displayName: "DR Lab - Primary Region Unhealthy"
 documentation:
   content: |

@@ -1,6 +1,4 @@
-# =============================================================================
-# GCP DR Cold Standby Lab - Main Terraform Configuration
-# =============================================================================
+# Main terraform config for GCP DR cold standby lab
 
 locals {
   timestamp = formatdate("YYYYMMDDhhmmss", timestamp())
@@ -11,16 +9,10 @@ locals {
   })
 }
 
-# =============================================================================
-# Random ID for unique naming
-# =============================================================================
 resource "random_id" "suffix" {
   byte_length = 4
 }
 
-# =============================================================================
-# Enable Required APIs
-# =============================================================================
 resource "google_project_service" "required_apis" {
   for_each = toset([
     "compute.googleapis.com",
@@ -37,9 +29,6 @@ resource "google_project_service" "required_apis" {
   disable_on_destroy = false
 }
 
-# =============================================================================
-# Networking Module
-# =============================================================================
 module "networking" {
   source = "./modules/networking"
 
@@ -54,9 +43,6 @@ module "networking" {
   depends_on = [google_project_service.required_apis]
 }
 
-# =============================================================================
-# Snapshot Policy Module
-# =============================================================================
 module "snapshot" {
   source = "./modules/snapshot"
 
@@ -70,9 +56,6 @@ module "snapshot" {
   depends_on = [google_project_service.required_apis]
 }
 
-# =============================================================================
-# Compute Module - Primary Region
-# =============================================================================
 module "compute_primary" {
   source = "./modules/compute"
 
@@ -110,9 +93,6 @@ module "compute_primary" {
   depends_on = [module.networking, module.snapshot]
 }
 
-# =============================================================================
-# Compute Module - Standby Region (Cold Standby)
-# =============================================================================
 module "compute_standby" {
   source = "./modules/compute"
 
@@ -150,9 +130,6 @@ module "compute_standby" {
   depends_on = [module.networking]
 }
 
-# =============================================================================
-# Heartbeat Instance (Primary Region Only)
-# =============================================================================
 module "heartbeat" {
   source = "./modules/heartbeat"
 
@@ -173,9 +150,6 @@ module "heartbeat" {
   depends_on = [module.compute_primary, module.compute_standby, module.load_balancing]
 }
 
-# =============================================================================
-# Load Balancing Module
-# =============================================================================
 module "load_balancing" {
   source = "./modules/load-balancing"
 
@@ -196,9 +170,6 @@ module "load_balancing" {
   depends_on = [module.compute_primary, module.compute_standby]
 }
 
-# =============================================================================
-# DNS Module
-# =============================================================================
 module "dns" {
   count  = var.enable_dns ? 1 : 0
   source = "./modules/dns"
@@ -216,9 +187,6 @@ module "dns" {
   depends_on = [module.load_balancing]
 }
 
-# =============================================================================
-# Monitoring Module
-# =============================================================================
 module "monitoring" {
   count  = var.enable_monitoring ? 1 : 0
   source = "./modules/monitoring"

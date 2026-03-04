@@ -1,13 +1,11 @@
 #!/bin/bash
-# =============================================================================
-# Failback Script - Return to Primary Region
-# =============================================================================
+# Failback script - returns traffic to the primary region
+
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -21,13 +19,11 @@ log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
 log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 log_step() { echo -e "${CYAN}[STEP]${NC} $1"; }
 
-# Banner
 echo "============================================================"
-echo "   GCP DR Cold Standby Lab - FAILBACK"
+echo "  DR Cold Standby Lab - FAILBACK"
 echo "============================================================"
 echo ""
 
-# Get configuration from Terraform
 cd "$PROJECT_ROOT/terraform"
 
 log_info "Loading configuration from Terraform state..."
@@ -47,7 +43,6 @@ echo "  Standby MIG:     $STANDBY_MIG ($STANDBY_REGION)"
 echo "  Load Balancer:   $LB_IP"
 echo ""
 
-# Parse arguments
 AUTO_APPROVE=false
 PRIMARY_SIZE=2
 GRADUAL=false
@@ -83,7 +78,6 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Check current status
 PRIMARY_COUNT=$(gcloud compute instance-groups managed list-instances "$PRIMARY_MIG" \
     --region="$PRIMARY_REGION" \
     --project="$PROJECT_ID" \
@@ -99,7 +93,6 @@ echo "  Primary instances:  $PRIMARY_COUNT"
 echo "  Standby instances:  $STANDBY_COUNT"
 echo ""
 
-# Confirm failback
 log_warning "This will FAILBACK to the primary region!"
 if [ "$GRADUAL" = true ]; then
     log_info "Gradual mode: Standby will remain active until primary is healthy"
@@ -121,18 +114,15 @@ echo ""
 log_info "Starting failback at $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 echo ""
 
-# Step 0: Disable autoscalers (required before manual resize)
-log_step "Step 0: Disabling autoscalers for manual control..."
+log_step "Step 0: Disabling autoscalers..."
 
-# Stop autoscaling on primary MIG
-log_info "  Stopping autoscaling on primary MIG..."
+log_info "  Stopping autoscaling on primary..."
 gcloud compute instance-groups managed stop-autoscaling "$PRIMARY_MIG" \
     --region="$PRIMARY_REGION" \
     --project="$PROJECT_ID" \
     --quiet 2>/dev/null || log_warning "  Primary autoscaler not found or already stopped"
 
-# Stop autoscaling on standby MIG
-log_info "  Stopping autoscaling on standby MIG..."
+log_info "  Stopping autoscaling on standby..."
 gcloud compute instance-groups managed stop-autoscaling "$STANDBY_MIG" \
     --region="$STANDBY_REGION" \
     --project="$PROJECT_ID" \
@@ -141,8 +131,7 @@ gcloud compute instance-groups managed stop-autoscaling "$STANDBY_MIG" \
 log_success "Autoscalers disabled"
 echo ""
 
-# Step 1: Scale up primary region
-log_step "Step 1: Scaling up primary region to $PRIMARY_SIZE instances..."
+log_step "Step 1: Scaling up primary to $PRIMARY_SIZE instances..."
 gcloud compute instance-groups managed resize "$PRIMARY_MIG" \
     --size="$PRIMARY_SIZE" \
     --region="$PRIMARY_REGION" \
@@ -150,7 +139,6 @@ gcloud compute instance-groups managed resize "$PRIMARY_MIG" \
     --quiet
 log_success "Primary region scale-up initiated"
 
-# Step 2: Wait for primary instances to be healthy
 log_step "Step 2: Waiting for primary instances to become healthy..."
 MAX_WAIT=600
 WAIT_INTERVAL=15
@@ -172,12 +160,10 @@ while [ $ELAPSED -lt $MAX_WAIT ]; do
         break
     fi
     
-    # Get actual running count by listing instances
     HEALTHY_COUNT=$(gcloud compute instance-groups managed list-instances "$PRIMARY_MIG" \
         --region="$PRIMARY_REGION" \
         --project="$PROJECT_ID" \
         --format="value(status)" 2>/dev/null | grep -c "RUNNING" || echo 0)
-    # Ensure HEALTHY_COUNT is a valid integer
     HEALTHY_COUNT=$(echo "$HEALTHY_COUNT" | tr -d '\n' | head -1)
     HEALTHY_COUNT=${HEALTHY_COUNT:-0}
     
@@ -201,23 +187,18 @@ if [ $ELAPSED -ge $MAX_WAIT ]; then
     exit 1
 fi
 
-# Step 3: Switch URL map back to primary backend
-log_step "Step 3: Switching load balancer to primary region..."
+log_step "Step 3: Switching load balancer to primary..."
 
-# Get URL map name
 URL_MAP=$(gcloud compute url-maps list --project="$PROJECT_ID" --filter="name~dr-url-map" --format="value(name)" | head -1)
 
 if [ -n "$URL_MAP" ]; then
     log_info "  URL Map: $URL_MAP"
     
-    # Export, modify, and import URL map (handles path_matcher routing)
     TEMP_FILE="/tmp/url-map-failback-$$.yaml"
     gcloud compute url-maps export "$URL_MAP" --global --project="$PROJECT_ID" --destination="$TEMP_FILE" 2>/dev/null
     
-    # Replace all standby backend references with primary
     sed -i 's/dr-backend-standby/dr-backend-primary/g' "$TEMP_FILE"
     
-    # Import the modified URL map
     gcloud compute url-maps import "$URL_MAP" --global --project="$PROJECT_ID" --source="$TEMP_FILE" --quiet 2>/dev/null
     
     rm -f "$TEMP_FILE"
@@ -226,9 +207,8 @@ else
     log_error "Could not find URL map"
 fi
 
-# Step 4: Verify primary is serving traffic
-log_step "Step 4: Verifying primary region is healthy..."
-sleep 30  # Give LB time to detect healthy backends
+log_step "Step 4: Verifying primary is serving traffic..."
+sleep 30
 
 # Test the application
 for i in {1..5}; do
@@ -238,9 +218,8 @@ for i in {1..5}; do
     sleep 2
 done
 
-# Step 5: Scale down standby region
 if [ "$GRADUAL" = true ]; then
-    log_step "Step 5 (Gradual): Scaling down standby region gradually..."
+    log_step "Step 5 (Gradual): Scaling down standby gradually..."
     
     CURRENT_STANDBY=$(gcloud compute instance-groups managed list-instances "$STANDBY_MIG" \
         --region="$STANDBY_REGION" \

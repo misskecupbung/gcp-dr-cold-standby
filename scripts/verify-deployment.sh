@@ -1,13 +1,11 @@
 #!/bin/bash
-# =============================================================================
-# Verify Deployment Script - Check Infrastructure Status
-# =============================================================================
+# Verify deployment - checks infrastructure status
+
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-# Colors
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 BLUE='\033[0;34m'
@@ -20,14 +18,13 @@ log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 log_warning() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 
 echo "============================================================"
-echo "   GCP DR Cold Standby Lab - Deployment Verification"
+echo "  DR Cold Standby Lab - Verify Deployment"
 echo "============================================================"
 echo ""
 
 cd "$PROJECT_ROOT/terraform"
 
-# Get outputs
-log_info "Loading Terraform outputs..."
+log_info "Loading terraform outputs..."
 PROJECT_ID=$(terraform output -raw project_id 2>/dev/null || gcloud config get-value project)
 PRIMARY_MIG=$(terraform output -raw primary_mig_name 2>/dev/null)
 STANDBY_MIG=$(terraform output -raw standby_mig_name 2>/dev/null)
@@ -44,7 +41,6 @@ echo "  Standby Region: $STANDBY_REGION"
 echo "  Load Balancer:  $LB_IP"
 echo ""
 
-# Check Primary MIG
 log_info "Checking Primary Instance Group..."
 PRIMARY_COUNT=$(gcloud compute instance-groups managed list-instances "$PRIMARY_MIG" \
     --region="$PRIMARY_REGION" \
@@ -61,7 +57,6 @@ else
 fi
 echo ""
 
-# Check Standby MIG
 log_info "Checking Standby Instance Group..."
 STANDBY_COUNT=$(gcloud compute instance-groups managed list-instances "$STANDBY_MIG" \
     --region="$STANDBY_REGION" \
@@ -78,11 +73,9 @@ else
 fi
 echo ""
 
-# Check Load Balancer
 log_info "Testing Load Balancer..."
 echo ""
 
-# HTTP health check
 HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" "http://$LB_IP/health" --connect-timeout 10 2>/dev/null || echo "000")
 if [ "$HTTP_STATUS" = "200" ]; then
     log_success "Load Balancer health endpoint: HTTP $HTTP_STATUS"
@@ -90,7 +83,6 @@ else
     log_warning "Load Balancer health endpoint: HTTP $HTTP_STATUS (may need more time)"
 fi
 
-# Application response
 APP_RESPONSE=$(curl -s "http://$LB_IP/" --connect-timeout 10 2>/dev/null || echo "{}")
 if echo "$APP_RESPONSE" | jq -e '.hostname' > /dev/null 2>&1; then
     HOSTNAME=$(echo "$APP_RESPONSE" | jq -r '.hostname')
@@ -101,7 +93,6 @@ else
 fi
 echo ""
 
-# Check Snapshots
 log_info "Checking Snapshot Policy..."
 SNAPSHOTS=$(gcloud compute snapshots list \
     --project="$PROJECT_ID" \
@@ -117,7 +108,6 @@ else
 fi
 echo ""
 
-# Check Heartbeat Instance
 log_info "Checking Heartbeat Instance..."
 HEARTBEAT_NAME=$(terraform output -raw heartbeat_instance_name 2>/dev/null)
 HEARTBEAT_STATUS=$(gcloud compute instances describe "$HEARTBEAT_NAME" \
@@ -132,7 +122,6 @@ else
 fi
 echo ""
 
-# Check Monitoring
 log_info "Checking Monitoring..."
 UPTIME_CHECKS=$(gcloud monitoring uptime-check-configs list \
     --project="$PROJECT_ID" \
@@ -146,9 +135,8 @@ else
 fi
 echo ""
 
-# Summary
 echo "============================================================"
-echo "   Verification Summary"
+echo "  Summary"
 echo "============================================================"
 echo ""
 echo "  Load Balancer URL:  http://$LB_IP"

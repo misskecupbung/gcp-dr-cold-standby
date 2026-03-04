@@ -1,6 +1,7 @@
 """
-DR Cold Standby Lab - Sample Application
-A simple Flask application demonstrating a stateless web service
+Sample app for the DR cold standby lab.
+Stateless Flask service that returns instance info - useful for verifying
+which region is handling traffic after failover.
 """
 
 from flask import Flask, jsonify, request
@@ -10,7 +11,6 @@ import logging
 from datetime import datetime
 import json
 
-# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -19,7 +19,6 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# Configuration
 REGION = os.environ.get('REGION', 'unknown')
 INSTANCE_NAME = socket.gethostname()
 VERSION = os.environ.get('APP_VERSION', '1.0.0')
@@ -27,7 +26,7 @@ START_TIME = datetime.utcnow()
 
 
 def get_instance_metadata():
-    """Get instance metadata from GCP metadata server"""
+    """Fetch zone/region info from the GCP metadata server."""
     try:
         import urllib.request
         headers = {'Metadata-Flavor': 'Google'}
@@ -58,7 +57,7 @@ def get_instance_metadata():
 
 @app.route('/health')
 def health():
-    """Health check endpoint for load balancer"""
+    """Health endpoint - LB uses this to check if we're alive."""
     return jsonify({
         'status': 'healthy',
         'hostname': INSTANCE_NAME,
@@ -69,8 +68,7 @@ def health():
 
 @app.route('/ready')
 def ready():
-    """Readiness probe endpoint"""
-    # Add any readiness checks here (e.g., database connectivity)
+    """Readiness check - could add DB connectivity tests here if needed."""
     return jsonify({
         'ready': True,
         'hostname': INSTANCE_NAME,
@@ -80,7 +78,7 @@ def ready():
 
 @app.route('/')
 def index():
-    """Main application endpoint"""
+    """Main endpoint - shows where the request landed."""
     metadata = get_instance_metadata()
     uptime = (datetime.utcnow() - START_TIME).total_seconds()
     
@@ -98,10 +96,9 @@ def index():
 
 @app.route('/api/data')
 def data():
-    """Sample data endpoint"""
+    """Returns some sample data along with server info."""
     metadata = get_instance_metadata()
     
-    # Simulate some application data
     sample_data = {
         'items': [
             {'id': 1, 'name': 'Item 1', 'value': 100},
@@ -122,7 +119,7 @@ def data():
 
 @app.route('/api/echo', methods=['POST'])
 def echo():
-    """Echo endpoint for testing"""
+    """Simple echo - returns whatever you POST to it."""
     data = request.get_json() or {}
     metadata = get_instance_metadata()
     
@@ -138,7 +135,7 @@ def echo():
 
 @app.route('/api/status')
 def status():
-    """Detailed status endpoint"""
+    """Extended status info about the running instance."""
     metadata = get_instance_metadata()
     uptime = (datetime.utcnow() - START_TIME).total_seconds()
     
@@ -165,8 +162,7 @@ def status():
 
 @app.route('/api/fail')
 def simulate_failure():
-    """Endpoint to simulate application failure (for testing)"""
-    # This can be used to test health check failures
+    """For testing - pass ?fail=true to make this return a 500."""
     fail = request.args.get('fail', 'false').lower() == 'true'
     
     if fail:
@@ -184,13 +180,13 @@ def simulate_failure():
 
 @app.before_request
 def log_request():
-    """Log incoming requests"""
+    """Log incoming requests."""
     logger.info(f"Request: {request.method} {request.path} from {request.remote_addr}")
 
 
 @app.after_request
 def add_headers(response):
-    """Add custom headers to response"""
+    """Tag responses with instance info."""
     response.headers['X-Served-By'] = INSTANCE_NAME
     response.headers['X-Region'] = REGION
     return response
@@ -198,7 +194,6 @@ def add_headers(response):
 
 @app.errorhandler(404)
 def not_found(error):
-    """Handle 404 errors"""
     return jsonify({
         'error': 'Not Found',
         'message': 'The requested resource was not found',
@@ -208,7 +203,6 @@ def not_found(error):
 
 @app.errorhandler(500)
 def internal_error(error):
-    """Handle 500 errors"""
     logger.error(f"Internal error: {error}")
     return jsonify({
         'error': 'Internal Server Error',

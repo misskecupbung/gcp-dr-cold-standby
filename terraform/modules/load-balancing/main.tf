@@ -1,10 +1,5 @@
-# =============================================================================
-# Load Balancing Module - Global HTTP(S) Load Balancer
-# =============================================================================
+# Load balancing module - global HTTP(S) LB
 
-# =============================================================================
-# Global Health Check
-# =============================================================================
 resource "google_compute_health_check" "global" {
   name    = "dr-global-health-check-${var.name_suffix}"
   project = var.project_id
@@ -24,9 +19,6 @@ resource "google_compute_health_check" "global" {
   }
 }
 
-# =============================================================================
-# Backend Service - Primary Region
-# =============================================================================
 resource "google_compute_backend_service" "primary" {
   name                  = "dr-backend-primary-${var.name_suffix}"
   project               = var.project_id
@@ -51,9 +43,6 @@ resource "google_compute_backend_service" "primary" {
   connection_draining_timeout_sec = 300
 }
 
-# =============================================================================
-# Backend Service - Standby Region
-# =============================================================================
 resource "google_compute_backend_service" "standby" {
   name                  = "dr-backend-standby-${var.name_suffix}"
   project               = var.project_id
@@ -78,9 +67,6 @@ resource "google_compute_backend_service" "standby" {
   connection_draining_timeout_sec = 300
 }
 
-# =============================================================================
-# URL Map with Failover
-# =============================================================================
 resource "google_compute_url_map" "default" {
   name            = "dr-url-map-${var.name_suffix}"
   project         = var.project_id
@@ -119,18 +105,12 @@ resource "google_compute_url_map" "default" {
   }
 }
 
-# =============================================================================
-# Target HTTP Proxy
-# =============================================================================
 resource "google_compute_target_http_proxy" "default" {
   name    = "dr-http-proxy-${var.name_suffix}"
   project = var.project_id
   url_map = google_compute_url_map.default.id
 }
 
-# =============================================================================
-# Global External IP Address
-# =============================================================================
 resource "google_compute_global_address" "default" {
   name         = "dr-lb-ip-${var.name_suffix}"
   project      = var.project_id
@@ -138,9 +118,6 @@ resource "google_compute_global_address" "default" {
   ip_version   = "IPV4"
 }
 
-# =============================================================================
-# Global Forwarding Rule
-# =============================================================================
 resource "google_compute_global_forwarding_rule" "http" {
   name                  = "dr-http-forwarding-rule-${var.name_suffix}"
   project               = var.project_id

@@ -1,10 +1,5 @@
-# =============================================================================
-# Heartbeat Module - Health Monitoring System
-# =============================================================================
+# Heartbeat module - health monitoring system
 
-# =============================================================================
-# Instance Template for Heartbeat
-# =============================================================================
 resource "google_compute_instance_template" "heartbeat" {
   name_prefix  = "dr-heartbeat-"
   project      = var.project_id
@@ -58,9 +53,6 @@ resource "google_compute_instance_template" "heartbeat" {
   }
 }
 
-# =============================================================================
-# Health Check for Heartbeat Instances
-# =============================================================================
 resource "google_compute_health_check" "heartbeat" {
   name    = "dr-heartbeat-health-check"
   project = var.project_id
@@ -75,9 +67,6 @@ resource "google_compute_health_check" "heartbeat" {
   }
 }
 
-# =============================================================================
-# Regional MIG - Primary Region Heartbeat
-# =============================================================================
 resource "google_compute_region_instance_group_manager" "heartbeat_primary" {
   name    = "dr-heartbeat-primary-mig"
   project = var.project_id
@@ -95,13 +84,8 @@ resource "google_compute_region_instance_group_manager" "heartbeat_primary" {
     health_check      = google_compute_health_check.heartbeat.id
     initial_delay_sec = 300
   }
-
-  # No update_policy needed for small regional MIG
 }
 
-# =============================================================================
-# Regional MIG - Standby Region Heartbeat
-# =============================================================================
 resource "google_compute_instance_template" "heartbeat_standby" {
   name_prefix  = "dr-heartbeat-standby-"
   project      = var.project_id
@@ -172,13 +156,8 @@ resource "google_compute_region_instance_group_manager" "heartbeat_standby" {
     health_check      = google_compute_health_check.heartbeat.id
     initial_delay_sec = 300
   }
-
-  # No update_policy needed for small regional MIG
 }
 
-# =============================================================================
-# Cloud Monitoring Uptime Check
-# =============================================================================
 resource "google_monitoring_uptime_check_config" "primary" {
   display_name = "DR Heartbeat - Primary Region"
   project      = var.project_id

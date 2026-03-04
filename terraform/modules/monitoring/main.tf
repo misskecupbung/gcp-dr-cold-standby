@@ -1,10 +1,5 @@
-# =============================================================================
-# Monitoring Module - Cloud Monitoring and Alerting
-# =============================================================================
+# Monitoring module - Cloud Monitoring and alerting
 
-# =============================================================================
-# Notification Channel
-# =============================================================================
 resource "google_monitoring_notification_channel" "email" {
   count        = var.notification_email != "" ? 1 : 0
   display_name = "DR Lab Email Notifications"
@@ -16,9 +11,6 @@ resource "google_monitoring_notification_channel" "email" {
   }
 }
 
-# =============================================================================
-# Uptime Check - Load Balancer Health
-# =============================================================================
 resource "google_monitoring_uptime_check_config" "lb_health" {
   display_name = "DR Lab - Load Balancer Health"
   project      = var.project_id
@@ -50,9 +42,6 @@ resource "google_monitoring_uptime_check_config" "lb_health" {
   }
 }
 
-# =============================================================================
-# Alert Policy - Primary Region Down
-# =============================================================================
 resource "google_monitoring_alert_policy" "primary_down" {
   display_name = "DR Lab - Primary Region Unhealthy"
   project      = var.project_id
@@ -90,9 +79,6 @@ resource "google_monitoring_alert_policy" "primary_down" {
   }
 }
 
-# =============================================================================
-# Alert Policy - Uptime Check Failed
-# =============================================================================
 resource "google_monitoring_alert_policy" "uptime_failed" {
   display_name = "DR Lab - Service Unavailable"
   project      = var.project_id
@@ -132,9 +118,6 @@ resource "google_monitoring_alert_policy" "uptime_failed" {
   }
 }
 
-# =============================================================================
-# Alert Policy - High Latency
-# =============================================================================
 resource "google_monitoring_alert_policy" "high_latency" {
   display_name = "DR Lab - High Latency"
   project      = var.project_id
@@ -172,9 +155,6 @@ resource "google_monitoring_alert_policy" "high_latency" {
   }
 }
 
-# =============================================================================
-# Dashboard
-# =============================================================================
 resource "google_monitoring_dashboard" "dr_dashboard" {
   dashboard_json = jsonencode({
     displayName = "DR Cold Standby Dashboard"
